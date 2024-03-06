@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "29653057414",
+    "firebase_url": "https://ece441-riskwatch-default-rtdb.firebaseio.com",
+    "project_id": "ece441-riskwatch",
+    "storage_bucket": "ece441-riskwatch.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:29653057414:android:d7532ce888ad648826f607",
+        "android_client_info": {
+          "package_name": "com.ece441.riskwatch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1XHaClyjGEdQcuLgYOXLz8qW5yNSA06I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
