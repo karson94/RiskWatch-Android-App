@@ -15,7 +15,7 @@
         android:id="@+id/batteryOutline"
         android:layout_width="175dp"
         android:layout_height="99dp"
-        android:layout_marginLeft="6dp"
+        android:layout_marginStart="6dp"
         android:rotation="90"
         android:scaleX=".7"
         android:scaleY="1.05"
@@ -25,7 +25,8 @@
         app:layout_constraintStart_toStartOf="@+id/batteryLevel"
         app:layout_constraintTop_toTopOf="@+id/batteryLevel"
         app:srcCompat="@drawable/battery_outline"
-        tools:visibility="invisible" />
+        tools:visibility="invisible"
+        android:contentDescription="@string/todo" />
 
     <TextView
         android:id="@+id/riskWatchText"
@@ -33,7 +34,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="48dp"
         android:shadowColor="#000000"
-        android:text="RiskWatch"
+        android:text="@string/riskwatch"
         android:textColor="#FFFFFF"
         android:textSize="34sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -46,7 +47,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="27dp"
-        android:text="Battery: 100%"
+        android:text="@string/battery_100"
         android:textColor="#000000"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.498"

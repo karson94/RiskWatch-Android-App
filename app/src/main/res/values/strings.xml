@@ -2,4 +2,7 @@
     <string name="app_name">RiskWatch</string>
     <string name="log_in">Log In</string>
     <string name="username">Username</string>
+    <string name="todo">TODO</string>
+    <string name="battery_100">Battery: 100%</string>
+    <string name="riskwatch">RiskWatch</string>
 </resources>
