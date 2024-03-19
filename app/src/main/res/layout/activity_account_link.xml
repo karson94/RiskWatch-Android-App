@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#377FC2"
+    tools:context=".AccountLink">
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="0dp"
+        android:layout_height="121dp"
+        android:background="#293E56"
+        android:backgroundTint="#293E56"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/currentUserIdText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginStart="148dp"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="149dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:text="@string/your_user_id"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/currentUserIdValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/currentUserIdText"
+        android:layout_centerHorizontal="true"
+        android:layout_marginStart="16dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        app:layout_constraintBottom_toBottomOf="@+id/currentUserIdText"
+        app:layout_constraintStart_toEndOf="@+id/currentUserIdText"
+        app:layout_constraintTop_toTopOf="@+id/currentUserIdText" />
+
+    <EditText
+        android:id="@+id/userIdInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="128dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/rounded_background"
+        android:fontFamily="@font/share_tech_mono"
+        android:hint="@string/enter_user_id"
+        android:inputType="text"
+        android:padding="16dp"
+        android:textColorHint="#000000"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/copyUserIdButton" />
+
+    <Button
+        android:id="@+id/linkButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/userIdInput"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:onClick="linkAccount"
+        android:text="@string/link_accounts"
+        app:layout_constraintEnd_toEndOf="@+id/userIdInput"
+        app:layout_constraintStart_toStartOf="@+id/userIdInput"
+        app:layout_constraintTop_toBottomOf="@+id/userIdInput" />
+
+    <Button
+        android:id="@+id/goBackButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="32dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:background="@drawable/rounded_dark"
+        android:onClick="goBackToHome"
+        android:text="@string/back_to_home"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/copyUserIdButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:onClick="copyUserId"
+        android:text="@string/copy_user_id"
+        app:layout_constraintEnd_toEndOf="@+id/currentUserIdValue"
+        app:layout_constraintStart_toStartOf="@+id/currentUserIdText"
+        app:layout_constraintTop_toBottomOf="@+id/currentUserIdText" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

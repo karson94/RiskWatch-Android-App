@@ -5,4 +5,19 @@
     <string name="todo">TODO</string>
     <string name="battery_100">Battery: 100%</string>
     <string name="riskwatch">RiskWatch</string>
+    <string name="hi_user">Hi User!</string>
+    <string name="log_out">Log Out</string>
+    <string name="riskwatch_logo">RiskWatch logo</string>
+    <string name="Password">password</string>
+    <string name="password">Password</string>
+    <string name="register">Register</string>
+    <string name="email">Email</string>
+    <string name="link_account">Link Account</string>
+    <string name="your_user_id">Your User ID:</string>
+    <string name="enter_user_id">Enter User ID</string>
+    <string name="link_accounts">Link Accounts</string>
+    <string name="go_back_to_home_activity">Go Back to Home Activity</string>
+    <string name="copy_user_id">Copy User ID</string>
+    <string name="back_to_home">Back to Home</string>
+    <string name="name">Name</string>
 </resources>
