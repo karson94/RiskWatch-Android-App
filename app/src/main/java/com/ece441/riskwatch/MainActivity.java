@@ -1,24 +1,15 @@
 package com.ece441.riskwatch;
 
 import static android.content.ContentValues.TAG;
-
-import android.Manifest;
-import android.bluetooth.*;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
+
 import android.os.Bundle;
 import androidx.activity.ComponentActivity;
 
-import android.content.pm.PackageManager;
+
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
-
-import androidx.core.content.ContextCompat;
-
 
 public class MainActivity extends ComponentActivity {
 

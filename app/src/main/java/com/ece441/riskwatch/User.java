@@ -1,6 +1,7 @@
 package com.ece441.riskwatch;
 
 import java.io.Serializable;
+import com.google.firebase.database.*;
 
 public class User implements Serializable {
 

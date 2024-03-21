@@ -23,7 +23,7 @@ import android.util.Log;
 
 // Firebase imports
 import com.google.firebase.database.*;
-import com.google.firebase.ktx.Firebase;
+//import com.google.firebase.ktx.Firebase;
 
 
 import java.util.ArrayList;
@@ -49,7 +49,7 @@ public class HomeActivity extends AppCompatActivity {
         if (intent != null){
             String username = intent.getStringExtra("user");
             currentUser = new User(username);
-            Log.d(TAG, "USERNAME" + currentUser.getUserName());
+            Log.d(TAG, "HOME USERNAME" + currentUser.getUserName());
         }
 
         //initReadDB("Bob");
