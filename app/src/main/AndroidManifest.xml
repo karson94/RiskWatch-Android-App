@@ -21,6 +21,9 @@
         android:theme="@style/Theme.RiskWatch"
         tools:targetApi="31">
         <activity
+            android:name=".LoginScreen"
+            android:exported="false" />
+        <activity
             android:name=".AccountLink"
             android:exported="false" />
         <activity

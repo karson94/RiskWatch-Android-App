@@ -28,7 +28,7 @@
         android:layout_marginEnd="149dp"
         android:fontFamily="@font/share_tech_mono"
         android:text="@string/your_user_id"
-        android:textColor="#FFFFFF"
+        android:textColor="#FFF9FDFF"
         android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -42,7 +42,7 @@
         android:layout_centerHorizontal="true"
         android:layout_marginStart="16dp"
         android:fontFamily="@font/share_tech_mono"
-        android:textColor="@color/white"
+        android:textColor="#FFF9FDFF"
         android:textSize="18sp"
         app:layout_constraintBottom_toBottomOf="@+id/currentUserIdText"
         app:layout_constraintStart_toEndOf="@+id/currentUserIdText"
@@ -54,7 +54,7 @@
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="128dp"
+        android:layout_marginTop="32dp"
         android:layout_marginEnd="16dp"
         android:background="@drawable/rounded_background"
         android:fontFamily="@font/share_tech_mono"
@@ -64,7 +64,8 @@
         android:textColorHint="#000000"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/copyUserIdButton" />
+        app:layout_constraintTop_toBottomOf="@+id/imageView"
+        android:autofillHints="" />
 
     <Button
         android:id="@+id/linkButton"
@@ -72,8 +73,9 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/userIdInput"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:fontFamily="@font/share_tech_mono"
+        android:textColor="#FFF9FDFF"
         android:onClick="linkAccount"
         android:text="@string/link_accounts"
         app:layout_constraintEnd_toEndOf="@+id/userIdInput"
@@ -88,7 +90,7 @@
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="32dp"
         android:fontFamily="@font/share_tech_mono"
-        android:background="@drawable/rounded_dark"
+        android:textColor="#FFF9FDFF"
         android:onClick="goBackToHome"
         android:text="@string/back_to_home"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -100,10 +102,35 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
+        android:layout_marginBottom="24dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:textColor="#FFF9FDFF"
         android:onClick="copyUserId"
         android:text="@string/copy_user_id"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
         app:layout_constraintEnd_toEndOf="@+id/currentUserIdValue"
         app:layout_constraintStart_toStartOf="@+id/currentUserIdText"
         app:layout_constraintTop_toBottomOf="@+id/currentUserIdText" />
+
+<!--    <TextView-->
+<!--        android:id="@+id/textView"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:layout_marginTop="32dp"-->
+<!--        android:fontFamily="@font/share_tech_mono"-->
+<!--        android:textColor="#FFF9FDFF"-->
+<!--        android:text="@string/currently_linked_users"-->
+<!--        android:textSize="16sp"-->
+<!--        app:layout_constraintStart_toStartOf="@+id/userIdInput"-->
+<!--        app:layout_constraintTop_toBottomOf="@+id/linkButton" />-->
+
+<!--    <TextView-->
+<!--        android:id="@+id/linkedUser"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:layout_marginTop="32dp"-->
+<!--        android:text="@string/textview"-->
+<!--        app:layout_constraintStart_toStartOf="@+id/textView"-->
+<!--        app:layout_constraintTop_toBottomOf="@+id/textView" />-->
 
 </androidx.constraintlayout.widget.ConstraintLayout>

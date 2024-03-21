@@ -20,4 +20,9 @@
     <string name="copy_user_id">Copy User ID</string>
     <string name="back_to_home">Back to Home</string>
     <string name="name">Name</string>
+    <string name="add_fall">Add Fall</string>
+    <string name="go_to_register">Go to Register</string>
+    <string name="currently_linked_users">Currently linked users</string>
+    <string name="textview">TextView</string>
+    <string name="account_linking">Account Linking</string>
 </resources>

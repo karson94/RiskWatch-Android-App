@@ -3,6 +3,7 @@ package com.ece441.riskwatch;
 import static android.content.ContentValues.TAG;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -20,6 +21,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -35,6 +37,8 @@ import com.google.firebase.auth.FirebaseUser;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+
+import java.util.Random;
 
 public class HomeActivity extends AppCompatActivity {
 
@@ -98,18 +102,70 @@ public class HomeActivity extends AppCompatActivity {
         recyclerView.setAdapter(fallItemAdapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
 
-//        contRead();
+//        Thread thread = new Thread(){
+//            @Override
+//            public void run(){
+//                try{
+//                    initRead();
+//                } catch(Exception e){
+//                    e.printStackTrace();
+//                }
+//                return;
+//            };
+//        };
+//
+//        thread.start();
+
+//        listenForNewFalls();
+//        delay(50000);
+//        addFallEntry(fireUser.getUid(),  "06:48 PM", "05/05/24", 15, 92, "Front", 2.6);
 
         //        registerBluetoothReceiver();
         //        connectToBluetoothDevice();
     }
 
     public void logOut(View view){
-        Intent intent = new Intent(this, MainActivity.class);
+        Intent intent = new Intent(this, LoginScreen.class);
         int faSize = fallArrayList.size();
         fallArrayList.clear();
         fallItemAdapter.notifyItemRangeRemoved(0,(faSize - 1));
         startActivity(intent);
+    }
+
+    public void addRandFall(View view){
+        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
+//        addFallEntry(fireUser.getUid(),  "06:48 PM", "05/05/24", 15, 92, "Front", 2.6);
+//            Random random = new Random();
+//
+//            // Random time in HH:MM AM/PM format
+//            int hour = random.nextInt(12) + 1;
+//            int minute = random.nextInt(60);
+//            String am_pm = random.nextBoolean() ? "AM" : "PM";
+//            String timeStr = String.format("%02d:%02d %s", hour, minute, am_pm);
+//
+//            // Random date in MM/DD/YY format
+//            int month = random.nextInt(12) + 1;
+//            int day = random.nextInt(28) + 1; // Assuming all months have max 28 days
+//            int year = random.nextInt(3) + 22; // Random year between 2022 and 2024
+//            String dateStr = String.format("%02d/%02d/%02d", month, day, year);
+//
+//            // Random delta Heart rate between -30 and 30
+//            int deltaHr = random.nextInt(61) - 30;
+//
+//            // Random heart rate between 60 and 115
+//            int heartRate = random.nextInt(56) + 60;
+//
+//            // Random direction
+//            String[] directions = {"Front", "Back", "Left", "Right"};
+//            String direction = directions[random.nextInt(directions.length)];
+//
+//            // Random impact severity in g (increments of 0.2 between 0.3 and 2.4)
+//            double impactSeverity = Math.round((random.nextDouble() * 2.1 + 0.3) * 10) / 10.0;
+
+            // Construct the entry string
+    //        addFallEntry(fireUser.getUid(),  timeStr, dateStr, deltaHr, heartRate, direction, impactSeverity);
+        addFallEntry(fireUser.getUid(),  "03:02 AM", "03/20/24", 20, 100, "Left", 0.4);
+        initRead();
     }
 
     public void addFallEntry(String userId, String time, String date,
@@ -132,143 +188,6 @@ public class HomeActivity extends AppCompatActivity {
         fallsRef.child(fallId).child("heartRate").setValue(heartRate);
         fallsRef.child(fallId).child("fallDirection").setValue(fallDirection);
         fallsRef.child(fallId).child("impactSeverity").setValue(impactSeverity);
-    }
-
-//    public void addFallEntry(String userName, String time, String date,
-//                             int deltaHeartRate, int heartRate, String fallDirection, double impactSeverity) {
-//        // Get a reference to the "users" directory in the Firebase Realtime Database
-//        FirebaseDatabase database = FirebaseDatabase.getInstance();
-//        DatabaseReference usersRef = database.getReference("users");
-//
-//        // Query the database to find the user with the given name
-//        Query query = usersRef.orderByChild("name").equalTo(userName);
-//        query.addListenerForSingleValueEvent(new ValueEventListener() {
-//            @Override
-//            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-//                if (dataSnapshot.exists()) {
-//                    DataSnapshot userSnapshot = dataSnapshot.getChildren().iterator().next();
-//
-//                    // Get the user ID
-//                    String userId = userSnapshot.getKey();
-//                    assert userId != null;
-//
-//                    // Get a reference to the "falls" directory under the specific user
-//                    DatabaseReference fallsRef = usersRef.child(userId).child("falls");
-//
-//                    // Generate a unique key for the new fall entry
-//                    String fallId = fallsRef.push().getKey();
-//                    assert fallId != null;
-//
-//                    // Write the fall data to the database under the generated fall ID
-//                    fallsRef.child(fallId).child("time").setValue(time);
-//                    fallsRef.child(fallId).child("date").setValue(date);
-//                    fallsRef.child(fallId).child("deltaHeartRate").setValue(deltaHeartRate);
-//                    fallsRef.child(fallId).child("heartRate").setValue(heartRate);
-//                    fallsRef.child(fallId).child("fallDirection").setValue(fallDirection);
-//                    fallsRef.child(fallId).child("impactSeverity").setValue(impactSeverity);
-//                } else {
-//                    // Handle the case where no user with the specified name is found
-//                }
-//            }
-//
-//            @Override
-//            public void onCancelled(@NonNull DatabaseError databaseError) {
-//                // Handle errors here
-//            }
-//        });
-//    }
-
-//    public void addFallEntry(String userName, String time, String date,
-//                             int deltaHeartRate, int heartRate, String fallDirection, double impactSeverity) {
-//        // Get a reference to the "users" directory in the Firebase Realtime Database
-//        DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("users");
-//
-//        // Get the current user
-//        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-//
-//        if (currentUser != null) {
-//            String userId = currentUser.getUid();
-//
-//            // Get a reference to the "falls" directory under the specific user's ID
-//            DatabaseReference fallsRef = FirebaseDatabase.getInstance().getReference("falls").child(userId);
-//
-//            // Generate a unique key for the new fall entry
-//            String fallId = fallsRef.push().getKey();
-//
-//            // Write the fall data to the database under the generated fall ID
-//            if (fallId != null) {
-//                // Create a map to hold fall data
-//                Map<String, Object> fallData = new HashMap<>();
-//                fallData.put("time", time);
-//                fallData.put("date", date);
-//                fallData.put("deltaHeartRate", deltaHeartRate);
-//                fallData.put("heartRate", heartRate);
-//                fallData.put("fallDirection", fallDirection);
-//                fallData.put("impactSeverity", impactSeverity);
-//
-//                // Set the fall data in the database
-//                fallsRef.child(fallId).setValue(fallData);
-//            }
-//        } else {
-//            // Handle the case where the user is not authenticated
-//            // You might want to redirect the user to the login screen or handle it differently
-//        }
-//    }
-
-    public void readDB() {
-
-        FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference user = database.getReference("userID");
-
-        user.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-
-                String time = dataSnapshot.child("fallTime").getValue(String.class);
-                String date= dataSnapshot.child("fallDate").getValue(String.class);
-
-                String heartRateString = dataSnapshot.child("currentHeartRate").getValue(String.class);
-                int heartRate = 0; // Default value or any other appropriate default
-                if (heartRateString != null && !heartRateString.isEmpty()) {
-                    try {
-                        heartRate = Integer.parseInt(heartRateString);
-                    } catch (NumberFormatException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                String deltaHeartRateString = dataSnapshot.child("currentHeartRate").getValue(String.class);
-                int deltaHeartRate = 0; // Default value or any other appropriate default
-                if (deltaHeartRateString != null && !deltaHeartRateString.isEmpty()) {
-                    try {
-                        deltaHeartRate = Integer.parseInt(deltaHeartRateString);
-                    } catch (NumberFormatException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                String impactSeverityString = dataSnapshot.child("impactSeverity").getValue(String.class);
-                double impactSeverity = 0; // Default value or any other appropriate default
-                if (impactSeverityString != null && !impactSeverityString.isEmpty()) {
-                    try {
-                        impactSeverity = Integer.parseInt(impactSeverityString);
-                    } catch (NumberFormatException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                String fallDirection = dataSnapshot.child("fallDirection").getValue(String.class);
-
-                //fallArrayList.add(new Fall(time, date, heartRate, impactSeverity, fallDirection));
-
-
-            }
-
-            @Override
-            public void onCancelled(DatabaseError error) {
-                Log.w(TAG, "Failed to read value.", error.toException());
-            }
-        });
     }
 
     public void initRead() {
@@ -328,6 +247,63 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
+    public void readFallsForUser(String userID) {
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
+        DatabaseReference userRef = database.getReference("users");
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+
+            if (currentUser == null) {
+            return;
+        }
+
+        DatabaseReference currentUserFallsRef = userRef.child(userID).child("falls");
+
+            currentUserFallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                for (DataSnapshot fallSnapshot : dataSnapshot.getChildren()) {
+                    // Process each fall as needed
+
+                    String fallID = fallSnapshot.getKey();
+                    String time = fallSnapshot.child("time").getValue(String.class);
+                    String date = fallSnapshot.child("date").getValue(String.class);
+                    int heartRate = fallSnapshot.child("heartRate").getValue(Integer.class);
+                    int deltaHeartRate = fallSnapshot.child("deltaHeartRate").getValue(Integer.class);
+                    double impactSeverity = fallSnapshot.child("impactSeverity").getValue(Double.class);
+                    String fallDirection = fallSnapshot.child("fallDirection").getValue(String.class);
+
+                    boolean fallExists = false;
+                    for (Fall fall : fallArrayList) {
+                        if (fall.getfallID().equals(fallID)) {
+                            fallExists = true;
+                            break;
+                        }
+                    }
+
+                    if (!fallExists) {
+                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
+                        fallItemAdapter.notifyItemInserted(0);
+                    }
+
+
+//                    fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
+//                    fallItemAdapter.notifyItemInserted(0);
+
+
+                    // Notify user of the fall
+
+
+                    // Now you have access to all fall attributes
+                    // Perform any further processing or UI updates here
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.w(TAG, "Failed to read value.", error.toException());
+            }
+        });
+    }
 
     public void initReadDB() {
         FirebaseDatabase database = FirebaseDatabase.getInstance();
@@ -368,36 +344,97 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    public void readFallsForUser(String userID) {
-        FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference userRef = database.getReference("users");
+    public void listenForNewFalls() {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-
         if (currentUser == null) {
+            // User is not authenticated, handle this case
             return;
         }
+        String ownerId = currentUser.getUid();
+        final String[] linkedAccountId = new String[1];
+        String linkAccID;
 
-        DatabaseReference currentUserFallsRef = userRef.child(userID).child("falls");
+        DatabaseReference currentUserFallsRef;
+        if (fallArrayList.isEmpty()) {
+            // If the falls list is empty, use the current user's ID
+            currentUserFallsRef = FirebaseDatabase.getInstance().getReference("users")
+                    .child(ownerId).child("falls");
+        } else {
+            // User does not have falls, check if linked to another account
+            DatabaseReference permissionsRef = FirebaseDatabase.getInstance().getReference("permissions");
 
-        currentUserFallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                for (DataSnapshot fallSnapshot : dataSnapshot.getChildren()) {
-                    // Process each fall as needed
-                    String fallID = fallSnapshot.getKey();
-                    String time = fallSnapshot.child("time").getValue(String.class);
-                    String date = fallSnapshot.child("date").getValue(String.class);
-                    int heartRate = fallSnapshot.child("heartRate").getValue(Integer.class);
-                    int deltaHeartRate = fallSnapshot.child("deltaHeartRate").getValue(Integer.class);
-                    double impactSeverity = fallSnapshot.child("impactSeverity").getValue(Double.class);
-                    String fallDirection = fallSnapshot.child("fallDirection").getValue(String.class);
-
-                    fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
-                    fallItemAdapter.notifyItemInserted(0);
-
-                    // Now you have access to all fall attributes
-                    // Perform any further processing or UI updates here
+            permissionsRef.orderByChild("grantedUsers/" + ownerId).equalTo(true).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    if (dataSnapshot.exists()) {
+                        // User is linked to another account, retrieve the owner ID
+                        for (DataSnapshot permissionSnapshot : dataSnapshot.getChildren()) {
+                            linkedAccountId[0] = permissionSnapshot.getKey();
+                        }
+                    }
                 }
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                        Log.w(TAG, "Failed to read value.", error.toException());
+                }
+            });
+
+            // If the falls list is not empty, use the linked account's ID
+            linkAccID = linkedAccountId[0]; // You need to implement this method
+            if (linkAccID == null) {
+                // If there's no linked account, return
+                return;
+            }
+            currentUserFallsRef = FirebaseDatabase.getInstance().getReference("users")
+                    .child(linkAccID).child("falls");
+        }
+
+        // Add a ChildEventListener to listen for new falls
+        currentUserFallsRef.addChildEventListener(new ChildEventListener() {
+            @Override
+            public void onChildAdded(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // Retrieve the new fall data and add it to the display
+                String fallID = dataSnapshot.getKey();
+
+                boolean fallExists = false;
+                for (Fall fall : fallArrayList) {
+                    if (fall.getfallID().equals(fallID)) {
+                        // Fall already exists, set flag and break loop
+                        fallExists = true;
+                        break;
+                    }
+
+                    if (!fallExists) {
+                        String time = dataSnapshot.child("time").getValue(String.class);
+                        String date = dataSnapshot.child("date").getValue(String.class);
+                        int heartRate = dataSnapshot.child("heartRate").getValue(Integer.class);
+                        int deltaHeartRate = dataSnapshot.child("deltaHeartRate").getValue(Integer.class);
+                        double impactSeverity = dataSnapshot.child("impactSeverity").getValue(Double.class);
+                        String fallDirection = dataSnapshot.child("fallDirection").getValue(String.class);
+
+                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
+                        fallItemAdapter.notifyItemInserted(0);
+
+                        // Now you have access to all fall attributes
+                        // Perform any further processing or UI updates here
+                    }
+
+                }
+            }
+
+            @Override
+            public void onChildChanged(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // Handle case where a fall's data has changed (if needed)
+            }
+
+            @Override
+            public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
+                // Handle case where a fall has been removed (if needed)
+            }
+
+            @Override
+            public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // Handle case where a fall has changed position (if needed)
             }
 
             @Override
@@ -406,7 +443,6 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
     }
-
 
 //    public void initReadDB(String userName) {
 //        FirebaseDatabase database = FirebaseDatabase.getInstance();
