@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
+
 public class FallItemAdapter extends RecyclerView.Adapter<MyViewHolder> {
 
     private final List<Fall> fallList;
@@ -47,22 +48,22 @@ public class FallItemAdapter extends RecyclerView.Adapter<MyViewHolder> {
         String severity;
         String deltaHR;
 
-        if(fall.getImpactSeverity() < 0.5){
+        if(fall.getImpactSeverity() <= 0.5){
             severity = "Soft";
-        } else if (fall.getImpactSeverity() < 1.5 && fall.getImpactSeverity() > 0.5) {
+        } else if (fall.getImpactSeverity() <= 2 && fall.getImpactSeverity() > 0.5) {
             severity = "Medium";
         }else{
             severity = "Hard";
         }
 
-        if (fall.getHeartRate() < 70) {
+        if (fall.getDeltaHeartRate() < 0) {
             deltaHR = "Low";
         }else{
             deltaHR = "High";
         }
 
 
-        holder.fallEventDesc.setText(severity + " Fall & " + deltaHR + " Heart Rate");
+        holder.fallEventDesc.setText(severity + " Fall & " + deltaHR + " HR");
 
     }
 

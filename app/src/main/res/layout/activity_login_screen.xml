@@ -6,9 +6,9 @@
     android:layout_height="match_parent"
     android:fontFamily="@font/share_tech_mono"
     android:background="#377FC2"
-    tools:context=".MainActivity">
+    tools:context=".LoginScreen">
 
-<!--    Username-->
+    <!--    Username-->
 
     <EditText
         android:id="@+id/userNameInput"
@@ -31,7 +31,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/titleView" />
 
-<!--    Password-->
+    <!--    Password-->
     <EditText
         android:id="@+id/passwordInput"
         android:layout_width="202dp"
