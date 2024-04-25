@@ -5,27 +5,39 @@ import static android.content.ContentValues.TAG;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import java.util.Set;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 // Firebase imports
 import com.google.firebase.database.*;
@@ -42,14 +54,16 @@ import java.util.Random;
 
 public class HomeActivity extends AppCompatActivity {
 
-    //Fall fall1 = new Fall("2:00pm", "2/26/24", 86, 0.7, "Back");
-    //Fall fall2 = new Fall("12:05pm", "2/21/24", 30, 4.5, "Right");
-
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
     private RecyclerView recyclerView;
     private static FallItemAdapter fallItemAdapter;
 
     User currentUser;
+
+    boolean startup = true;
+
+    private static final String CHANNEL_ID = "fall_notification_channel";
+    private static final int NOTIFICATION_ID = 123;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,7 +74,7 @@ public class HomeActivity extends AppCompatActivity {
 
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
 
-        if (intent != null){
+        if (intent != null) {
             String username = intent.getStringExtra("user");
             currentUser = new User(username);
             Log.d(TAG, "HOME USERNAME " + currentUser.getUserName());
@@ -69,8 +83,9 @@ public class HomeActivity extends AppCompatActivity {
         }
 
         //initReadDB("Bob");
-        initRead();
 
+        initRead();
+        startup = false;
 
         TextView userNameDisplay = findViewById(R.id.userNameView);
         userNameDisplay.setText("Hi " + currentUser.getUserName() + "!");
@@ -102,70 +117,73 @@ public class HomeActivity extends AppCompatActivity {
         recyclerView.setAdapter(fallItemAdapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
 
-//        Thread thread = new Thread(){
-//            @Override
-//            public void run(){
-//                try{
-//                    initRead();
-//                } catch(Exception e){
-//                    e.printStackTrace();
-//                }
-//                return;
-//            };
-//        };
-//
-//        thread.start();
+        Thread thread = new Thread(() -> {
+            try {
+                while (true) {
+                    initRead();
+                    Thread.sleep(1000); // Add a delay of 5 seconds between each read
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
 
-//        listenForNewFalls();
-//        delay(50000);
-//        addFallEntry(fireUser.getUid(),  "06:48 PM", "05/05/24", 15, 92, "Front", 2.6);
-
-        //        registerBluetoothReceiver();
-        //        connectToBluetoothDevice();
+        thread.start();
     }
 
-    public void logOut(View view){
+    public void notifyFallToast(Context context/*, String fallTime String fallData, String fallDirection*/) {
+        String notif = "Fall detected";
+        Toast.makeText(context, notif, Toast.LENGTH_LONG).show();
+    }
+
+    // Method to show a notification when a fall occurs
+    private void notifyFallBanner(Context context, String time, String date, String fallDirection) {
+        Log.d(TAG, "Inside notifyFallBanner now");
+        // Create a notification channel if Android version is Oreo or above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = "Fall Notification";
+            String description = "Channel for fall notifications";
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+
+            NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        // Create the notification
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_icon)
+                .setContentTitle("Fall Detected")
+                .setContentText("A fall occurred at " + time + " on " + date + ". Direction: " + fallDirection)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+        // Show the notification
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        notificationManager.notify(NOTIFICATION_ID, builder.build());
+    }
+
+    public void logOut(View view) {
         Intent intent = new Intent(this, LoginScreen.class);
         int faSize = fallArrayList.size();
         fallArrayList.clear();
-        fallItemAdapter.notifyItemRangeRemoved(0,(faSize - 1));
+        fallItemAdapter.notifyItemRangeRemoved(0, (faSize - 1));
         startActivity(intent);
     }
 
-    public void addRandFall(View view){
+    public void addRandFall(View view) {
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
-//        addFallEntry(fireUser.getUid(),  "06:48 PM", "05/05/24", 15, 92, "Front", 2.6);
-//            Random random = new Random();
-//
-//            // Random time in HH:MM AM/PM format
-//            int hour = random.nextInt(12) + 1;
-//            int minute = random.nextInt(60);
-//            String am_pm = random.nextBoolean() ? "AM" : "PM";
-//            String timeStr = String.format("%02d:%02d %s", hour, minute, am_pm);
-//
-//            // Random date in MM/DD/YY format
-//            int month = random.nextInt(12) + 1;
-//            int day = random.nextInt(28) + 1; // Assuming all months have max 28 days
-//            int year = random.nextInt(3) + 22; // Random year between 2022 and 2024
-//            String dateStr = String.format("%02d/%02d/%02d", month, day, year);
-//
-//            // Random delta Heart rate between -30 and 30
-//            int deltaHr = random.nextInt(61) - 30;
-//
-//            // Random heart rate between 60 and 115
-//            int heartRate = random.nextInt(56) + 60;
-//
-//            // Random direction
-//            String[] directions = {"Front", "Back", "Left", "Right"};
-//            String direction = directions[random.nextInt(directions.length)];
-//
-//            // Random impact severity in g (increments of 0.2 between 0.3 and 2.4)
-//            double impactSeverity = Math.round((random.nextDouble() * 2.1 + 0.3) * 10) / 10.0;
-
-            // Construct the entry string
-    //        addFallEntry(fireUser.getUid(),  timeStr, dateStr, deltaHr, heartRate, direction, impactSeverity);
-        addFallEntry(fireUser.getUid(),  "03:02 AM", "03/20/24", 20, 100, "Left", 0.4);
-        initRead();
+        addFallEntry(fireUser.getUid(), "03:02 AM", "03/20/24", 20, 100, "Left", 0.4);
     }
 
     public void addFallEntry(String userId, String time, String date,
@@ -252,13 +270,13 @@ public class HomeActivity extends AppCompatActivity {
         DatabaseReference userRef = database.getReference("users");
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
 
-            if (currentUser == null) {
+        if (currentUser == null) {
             return;
         }
 
         DatabaseReference currentUserFallsRef = userRef.child(userID).child("falls");
 
-            currentUserFallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+        currentUserFallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 for (DataSnapshot fallSnapshot : dataSnapshot.getChildren()) {
@@ -283,158 +301,16 @@ public class HomeActivity extends AppCompatActivity {
                     if (!fallExists) {
                         fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
                         fallItemAdapter.notifyItemInserted(0);
-                    }
+                        recyclerView.scrollToPosition(0);
 
+                        notifyFallBanner(HomeActivity.this, "Now", "Today", "Wherever");
 
-//                    fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
-//                    fallItemAdapter.notifyItemInserted(0);
+                        if (!startup) {
+//                            notifyFallToast(HomeActivity.this);
 
-
-                    // Notify user of the fall
-
-
-                    // Now you have access to all fall attributes
-                    // Perform any further processing or UI updates here
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.w(TAG, "Failed to read value.", error.toException());
-            }
-        });
-    }
-
-    public void initReadDB() {
-        FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference userRef = database.getReference("users");
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-
-        if (currentUser == null) {
-            return;
-        }
-        String userID = currentUser.getUid();
-        DatabaseReference currentUserFallsRef = userRef.child(userID).child("falls");
-
-        currentUserFallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                for (DataSnapshot fallSnapshot : dataSnapshot.getChildren()) {
-                    // Process each fall as needed
-                    String fallID = fallSnapshot.getKey();
-                    String time = fallSnapshot.child("time").getValue(String.class);
-                    String date = fallSnapshot.child("date").getValue(String.class);
-                    int heartRate = fallSnapshot.child("heartRate").getValue(Integer.class);
-                    int deltaHeartRate = fallSnapshot.child("deltaHeartRate").getValue(Integer.class);
-                    double impactSeverity = fallSnapshot.child("impactSeverity").getValue(Double.class);
-                    String fallDirection = fallSnapshot.child("fallDirection").getValue(String.class);
-
-                    fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
-                    fallItemAdapter.notifyItemInserted(0);
-
-                        // Now you have access to all fall attributes
-                        // Perform any further processing or UI updates here
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.w(TAG, "Failed to read value.", error.toException());
-            }
-        });
-    }
-
-    public void listenForNewFalls() {
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
-            // User is not authenticated, handle this case
-            return;
-        }
-        String ownerId = currentUser.getUid();
-        final String[] linkedAccountId = new String[1];
-        String linkAccID;
-
-        DatabaseReference currentUserFallsRef;
-        if (fallArrayList.isEmpty()) {
-            // If the falls list is empty, use the current user's ID
-            currentUserFallsRef = FirebaseDatabase.getInstance().getReference("users")
-                    .child(ownerId).child("falls");
-        } else {
-            // User does not have falls, check if linked to another account
-            DatabaseReference permissionsRef = FirebaseDatabase.getInstance().getReference("permissions");
-
-            permissionsRef.orderByChild("grantedUsers/" + ownerId).equalTo(true).addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    if (dataSnapshot.exists()) {
-                        // User is linked to another account, retrieve the owner ID
-                        for (DataSnapshot permissionSnapshot : dataSnapshot.getChildren()) {
-                            linkedAccountId[0] = permissionSnapshot.getKey();
                         }
                     }
                 }
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                        Log.w(TAG, "Failed to read value.", error.toException());
-                }
-            });
-
-            // If the falls list is not empty, use the linked account's ID
-            linkAccID = linkedAccountId[0]; // You need to implement this method
-            if (linkAccID == null) {
-                // If there's no linked account, return
-                return;
-            }
-            currentUserFallsRef = FirebaseDatabase.getInstance().getReference("users")
-                    .child(linkAccID).child("falls");
-        }
-
-        // Add a ChildEventListener to listen for new falls
-        currentUserFallsRef.addChildEventListener(new ChildEventListener() {
-            @Override
-            public void onChildAdded(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
-                // Retrieve the new fall data and add it to the display
-                String fallID = dataSnapshot.getKey();
-
-                boolean fallExists = false;
-                for (Fall fall : fallArrayList) {
-                    if (fall.getfallID().equals(fallID)) {
-                        // Fall already exists, set flag and break loop
-                        fallExists = true;
-                        break;
-                    }
-
-                    if (!fallExists) {
-                        String time = dataSnapshot.child("time").getValue(String.class);
-                        String date = dataSnapshot.child("date").getValue(String.class);
-                        int heartRate = dataSnapshot.child("heartRate").getValue(Integer.class);
-                        int deltaHeartRate = dataSnapshot.child("deltaHeartRate").getValue(Integer.class);
-                        double impactSeverity = dataSnapshot.child("impactSeverity").getValue(Double.class);
-                        String fallDirection = dataSnapshot.child("fallDirection").getValue(String.class);
-
-                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
-                        fallItemAdapter.notifyItemInserted(0);
-
-                        // Now you have access to all fall attributes
-                        // Perform any further processing or UI updates here
-                    }
-
-                }
-            }
-
-            @Override
-            public void onChildChanged(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
-                // Handle case where a fall's data has changed (if needed)
-            }
-
-            @Override
-            public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
-                // Handle case where a fall has been removed (if needed)
-            }
-
-            @Override
-            public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
-                // Handle case where a fall has changed position (if needed)
             }
 
             @Override
@@ -443,63 +319,6 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
     }
-
-//    public void initReadDB(String userName) {
-//        FirebaseDatabase database = FirebaseDatabase.getInstance();
-//        DatabaseReference userRef = database.getReference("users");
-//
-//        userRef.orderByChild("name").equalTo(userName).addListenerForSingleValueEvent(new ValueEventListener() {
-//            @Override
-//            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-//                if (dataSnapshot.exists()) {
-//                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-//                        String userID = userSnapshot.getKey();
-//
-//                        // Now you have the user ID (userID) for the specified user
-//                        // Continue to read falls for this user
-//                        assert userID != null;
-//                        DatabaseReference fallsRef = userRef.child(userID).child("falls");
-//
-//                        fallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
-//                            @Override
-//                            public void onDataChange(@NonNull DataSnapshot fallsSnapshot) {
-//                                for (DataSnapshot fallSnapshot : fallsSnapshot.getChildren()) {
-//                                    // Process each fall as needed
-//                                    String fallID = fallSnapshot.getKey();
-//                                    String time = fallSnapshot.child("time").getValue(String.class);
-//                                    String date = fallSnapshot.child("date").getValue(String.class);
-//
-//                                    int heartRate = fallSnapshot.child("heartRate").getValue(Integer.class);
-//
-//                                    int deltaHeartRate = fallSnapshot.child("deltaHeartRate").getValue(Integer.class);
-//
-//                                    double impactSeverity = fallSnapshot.child("impactSeverity").getValue(Double.class);
-//
-//                                    String fallDirection = fallSnapshot.child("fallDirection").getValue(String.class);
-//
-//                                    fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
-//                                    fallItemAdapter.notifyItemInserted(0);
-//
-//                                    // Now you have access to all fall attributes
-//                                    // Perform any further processing or UI updates here
-//                                }
-//                            }
-//
-//                            @Override
-//                            public void onCancelled(DatabaseError error) {
-//                                Log.w(TAG, "Failed to read value.", error.toException());
-//                            }
-//                        });
-//                    }
-//                }
-//            }
-//
-//            @Override
-//            public void onCancelled(@NonNull DatabaseError databaseError) {
-//                // Handle errors here
-//            }
-//        });
-//    }
 
     public void accountLink(View view) {
         Intent intent = new Intent(this, AccountLink.class);
@@ -521,65 +340,112 @@ public class HomeActivity extends AppCompatActivity {
         usersRef.child(userId).child("name").setValue(userName);
     }
 
-    private final BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
+    public class BluetoothDataReceiverActivity extends AppCompatActivity {
+
+        private static final String TAG = "BluetoothDataReceiver";
+
+        private BluetoothAdapter bluetoothAdapter;
+        private BluetoothGatt bluetoothGatt;
+        String deviceAddress = "00:11:22:33:44:55";
+
+//        private BluetoothGattCharacteristic = "0000dfb1-0000-1000-8000-00805f9b34fb";
+
+        private final BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
+            @SuppressLint("MissingPermission")
+            @Override
+            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                super.onConnectionStateChange(gatt, status, newState);
+                if (newState == BluetoothGatt.STATE_CONNECTED) {
+                    Log.d(TAG, "BluetoothGattCallback: Device connected");
+                    // Discover services when connected
+                    gatt.discoverServices();
+                } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+                    Log.d(TAG, "BluetoothGattCallback: Device disconnected");
+                    // Handle device disconnection
+                }
+            }
+
+            @Override
+            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+                super.onCharacteristicChanged(gatt, characteristic);
+                // Received data from Bluetooth device
+                byte[] data = characteristic.getValue();
+                if (data != null) {
+                    String receivedData = new String(data); // Convert byte array to String
+                    Log.d(TAG, "Received data from Bluetooth device: " + receivedData);
+                    // Process received data as needed
+                    processData(receivedData);
+                }
+            }
+        };
+
+        @SuppressLint("MissingPermission")
         @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            // Handle connection state changes
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+
+            // Initialize BluetoothAdapter
+            BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            if (bluetoothManager != null) {
+                bluetoothAdapter = bluetoothManager.getAdapter();
+            }
+
+            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+
+            for (BluetoothDevice device : pairedDevices) {
+                if ("RiskWatch".equals(device.getName())) {
+                    // Found the device named "RiskWatch", retrieve its address
+                    String deviceName = device.getName();
+                    deviceAddress = device.getAddress();
+                    Log.d(TAG, "Found device: " + deviceName + ", Address: " + deviceAddress);
+                    break; // Exit loop after finding the device
+                }
+            }
+
+
+            // Example: Connect to a specific Bluetooth device (already paired)
+            deviceAddress = "";
+            BluetoothDevice bluetoothDevice = bluetoothAdapter.getRemoteDevice(deviceAddress);
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
+            bluetoothGatt = bluetoothDevice.connectGatt(this, false, bluetoothGattCallback);
         }
 
         @Override
-        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-            // Handle characteristic changes (received data)
-            byte[] data = characteristic.getValue();
-            if (data != null) {
-                // Process and display the received data
-                updateData(new String(data));
+        protected void onDestroy() {
+            super.onDestroy();
+            // Clean up resources
+            if (bluetoothGatt != null) {
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    // TODO: Consider calling
+                    //    ActivityCompat#requestPermissions
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+                    return;
+                }
+                bluetoothGatt.disconnect();
+                bluetoothGatt.close();
+                bluetoothGatt = null;
             }
         }
-    };
 
-    private final BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            // Handle Bluetooth events here
-        }
-    };
-
-    private BluetoothAdapter bluetoothAdapter;
-
-    private BluetoothGatt bluetoothGatt;
-
-    private String bleDeviceAddress = "Your_BLE_Device_Address";
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        unregisterReceiver(bluetoothReceiver);
-        disconnectBluetoothDevice();
-    }
-
-    private void registerBluetoothReceiver() {
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
-        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        registerReceiver(bluetoothReceiver, filter);
-    }
-
-    private void connectToBluetoothDevice() {
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT)
-                == PackageManager.PERMISSION_GRANTED) {
-            BluetoothDevice device = bluetoothAdapter.getRemoteDevice(bleDeviceAddress);
-            bluetoothGatt = device.connectGatt(this, false, bluetoothGattCallback);
+        private void processData(String data) {
+            notifyFallToast(HomeActivity.this);
+            // Process the received data, update UI, or trigger further actions
+            // Example: Update UI with received data
+            // textView.setText(data);
         }
     }
 
-    private void disconnectBluetoothDevice() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
-                == PackageManager.PERMISSION_GRANTED) {
-            bluetoothGatt.disconnect();
-            bluetoothGatt.close();
-        }
-    }
-    private void updateData(String data) {
-        // Update your UI with the received data
-    }
 }
