@@ -82,8 +82,6 @@ public class HomeActivity extends AppCompatActivity {
             Log.d(TAG, "FireAuth UID: " + fireUser.getUid());
         }
 
-        //initReadDB("Bob");
-
         initRead();
         startup = false;
 
@@ -93,6 +91,7 @@ public class HomeActivity extends AppCompatActivity {
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference usersRef = database.getReference("users");
 
+        // Instantiate user if they do not exist by getting account's user name
         usersRef.orderByChild("name").equalTo(currentUser.getUserName()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -101,7 +100,7 @@ public class HomeActivity extends AppCompatActivity {
                     createUserDB(currentUser.getUserName());
                 }
 
-                // Add a fall entry for user
+                // Add a fall entry for user as a test to ensure we can store a fall for them
 //                addFallEntry(fireUser.getUid(),  "06:48 PM", "01/05/24", 15, 92, "Front", 2.6);
 
             }
@@ -112,31 +111,41 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
 
+        // Create recycler view
         recyclerView = findViewById(R.id.fallRecycler);
+        // Pass Fall list to the adapter
         fallItemAdapter = new FallItemAdapter(fallArrayList, this);
+        // Pass adapter to recycler view
         recyclerView.setAdapter(fallItemAdapter);
+        // Make recycler have vertical layout
         recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
 
+        // Thread to read database after every second
         Thread thread = new Thread(() -> {
             try {
                 while (true) {
+                    // Actual database read function
                     initRead();
-                    Thread.sleep(1000); // Add a delay of 5 seconds between each read
+                    // Delay (up for debate, should be maybe 30 seconds?)
+                    Thread.sleep(1000); // Add a delay of 1 second between each read
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         });
 
+        // Start thread
         thread.start();
     }
 
+    // Android "Toast" notif. Only appears in app
     public void notifyFallToast(Context context/*, String fallTime String fallData, String fallDirection*/) {
         String notif = "Fall detected";
         Toast.makeText(context, notif, Toast.LENGTH_LONG).show();
     }
 
-    // Method to show a notification when a fall occurs
+    // WIP
+    // Trigger device banner notification
     private void notifyFallBanner(Context context, String time, String date, String fallDirection) {
         Log.d(TAG, "Inside notifyFallBanner now");
         // Create a notification channel if Android version is Oreo or above
@@ -173,6 +182,7 @@ public class HomeActivity extends AppCompatActivity {
         notificationManager.notify(NOTIFICATION_ID, builder.build());
     }
 
+    // Logs current user out of the application, take user back to login screen
     public void logOut(View view) {
         Intent intent = new Intent(this, LoginScreen.class);
         int faSize = fallArrayList.size();
@@ -181,11 +191,14 @@ public class HomeActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    // Adds sample fall to current user for testing purposes (Let's make this dynamic instead of the static)
+    // Does this via addFallEntry
     public void addRandFall(View view) {
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
         addFallEntry(fireUser.getUid(), "03:02 AM", "03/20/24", 20, 100, "Left", 0.4);
     }
 
+    // Gets passed fall metrics, creates new fall in database for current user
     public void addFallEntry(String userId, String time, String date,
                              int deltaHeartRate, int heartRate, String fallDirection, double impactSeverity) {
         // Get a reference to the "users" directory in the Firebase Realtime Database
@@ -208,6 +221,9 @@ public class HomeActivity extends AppCompatActivity {
         fallsRef.child(fallId).child("impactSeverity").setValue(impactSeverity);
     }
 
+    // Needs to get re-organized. Is the main function that checks if the current user is just a "listener" or if they are the senior
+    // If fall listener, read the user's permission list and display the list of falls
+    // If fall creator, display own falls
     public void initRead() {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) {
@@ -265,6 +281,7 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
+    // This will actually read the database for the passed userID's falls
     public void readFallsForUser(String userID) {
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference userRef = database.getReference("users");
@@ -320,13 +337,14 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
+    // Takes user to linking page
     public void accountLink(View view) {
         Intent intent = new Intent(this, AccountLink.class);
         startActivity(intent);
     }
 
 
-    // Function to write a user entry
+    // Creates user in the database
     public static void createUserDB(String userName) {
         // Get a reference to the "users" directory in the Firebase Realtime Database
         FirebaseDatabase database = FirebaseDatabase.getInstance();
@@ -339,6 +357,8 @@ public class HomeActivity extends AppCompatActivity {
         assert userId != null;
         usersRef.child(userId).child("name").setValue(userName);
     }
+
+    // ANYTHING AFTER THIS IS BLUETOOTH BUT UNTESTED/INCORRECT
 
     public class BluetoothDataReceiverActivity extends AppCompatActivity {
 
