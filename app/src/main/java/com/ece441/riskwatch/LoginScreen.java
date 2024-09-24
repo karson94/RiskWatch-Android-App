@@ -79,15 +79,6 @@ public class LoginScreen extends AppCompatActivity {
                         Toast.makeText(LoginScreen.this, "Authentication failed. " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
-
-//        user = new User(edit.getText().toString());
-//
-//        Intent intent = new Intent(this, HomeActivity.class);
-//        intent.putExtra("user", user.getUserName());
-//
-//        Log.d(TAG, "MAIN USERNAME" + user.getUserName());
-//
-//        startActivity(intent);
     }
 
     public void goToRegistration(View view) {

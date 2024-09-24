@@ -34,60 +34,9 @@ public class MainActivity extends ComponentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-//        mAuth = FirebaseAuth.getInstance();
         Intent intent = new Intent(MainActivity.this, LoginScreen.class);
         startActivity(intent);
-
-//        Intent intent = new Intent(MainActivity.this, HomeActivity.class);
-
-
     }
-
-//    public void login(View view){
-//
-//        EditText editUsername = findViewById(R.id.userNameInput);
-//        EditText editPassword = findViewById(R.id.passwordInput);
-//        String email = editUsername.getText().toString().trim();
-//        String password = editPassword.getText().toString().trim();
-//
-//        if (email.isEmpty() || password.isEmpty()) {
-//            Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
-//            return;
-//        }
-//
-//        mAuth.signInWithEmailAndPassword(email, password)
-//                .addOnCompleteListener(this, task -> {
-//                    if (task.isSuccessful()) {
-//                        // Sign in success, update UI with the signed-in user's information
-//                        FirebaseUser fireUser = mAuth.getCurrentUser();
-//                        if (fireUser != null) {
-//                            Intent intent = new Intent(MainActivity.this, HomeActivity.class);
-//                            intent.putExtra("user", fireUser.getDisplayName());
-//                            Log.d(TAG, "MAIN USERNAME " + fireUser.getDisplayName());
-//                            startActivity(intent);
-//                        }
-//                    } else {
-//                        // If sign in fails, display a message to the user.
-//                        Toast.makeText(MainActivity.this, "Authentication failed. " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-//                    }
-//                });
-
-//        user = new User(edit.getText().toString());
-//
-//        Intent intent = new Intent(this, HomeActivity.class);
-//        intent.putExtra("user", user.getUserName());
-//
-//        Log.d(TAG, "MAIN USERNAME" + user.getUserName());
-//
-//        startActivity(intent);
-//    }
-
-//    public void goToRegistration(View view) {
-//        Intent intent = new Intent(this, Register.class);
-//        startActivity(intent);
-//    }
-
 }
 
 

@@ -27,10 +27,6 @@ public class FallItemAdapter extends RecyclerView.Adapter<MyViewHolder> {
     public MyViewHolder onCreateViewHolder(@NonNull final ViewGroup parent, int viewType) {
 
         View itemView = LayoutInflater.from(parent.getContext()).inflate(R.layout.fall_items, parent, false);
-
-//        itemView.setOnLongClickListener(homeActivity);
-//        itemView.setOnClickListener(homeActivity);
-
         return new MyViewHolder(itemView);
     }
 
@@ -61,7 +57,6 @@ public class FallItemAdapter extends RecyclerView.Adapter<MyViewHolder> {
         }else{
             deltaHR = "High";
         }
-
 
         holder.fallEventDesc.setText(severity + " Fall & " + deltaHR + " HR");
 
