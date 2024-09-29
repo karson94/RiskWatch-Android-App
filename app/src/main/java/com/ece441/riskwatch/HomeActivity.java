@@ -281,8 +281,6 @@ public class HomeActivity extends AppCompatActivity {
                         fallItemAdapter.notifyItemInserted(0);
                         recyclerView.scrollToPosition(0);
 
-                        notifyFallBanner(HomeActivity.this, "Now", "Today", "Wherever");
-
                         if (!startup) {
 //                            notifyFallToast(HomeActivity.this);
 
