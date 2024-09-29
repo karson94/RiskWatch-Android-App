@@ -18,7 +18,6 @@ import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -84,8 +83,7 @@ public class HomeActivity extends AppCompatActivity {
         startup = false;
 
         TextView userNameDisplay = findViewById(R.id.userNameView);
-        // userNameDisplay.setText("Hi " + currentUser.getUserName() + "!");
-        userNameDisplay.setText(String.format("Hi %s!", currentUser.getUserName()));
+        userNameDisplay.setText("Hi " + currentUser.getUserName() + "!");
 
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference usersRef = database.getReference("users");
@@ -143,7 +141,7 @@ public class HomeActivity extends AppCompatActivity {
         Toast.makeText(context, notif, Toast.LENGTH_LONG).show();
     }
 
-    // implement notifyBanner() here
+    // Banner notif here
 
     // Logs current user out of the application, take user back to login screen
     public void logOut(View view) {
@@ -282,8 +280,11 @@ public class HomeActivity extends AppCompatActivity {
                         fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
                         fallItemAdapter.notifyItemInserted(0);
                         recyclerView.scrollToPosition(0);
+
+                        notifyFallBanner(HomeActivity.this, "Now", "Today", "Wherever");
+
                         if (!startup) {
-                        // notifyFallToast(HomeActivity.this);
+//                            notifyFallToast(HomeActivity.this);
 
                         }
                     }
