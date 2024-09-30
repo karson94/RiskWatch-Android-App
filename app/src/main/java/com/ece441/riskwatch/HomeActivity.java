@@ -98,7 +98,7 @@ public class HomeActivity extends AppCompatActivity {
                 }
 
                 // Add a fall entry for user as a test to ensure we can store a fall for them
-//                addFallEntry(fireUser.getUid(),  "06:48 PM", "01/05/24", 15, 92, "Front", 2.6);
+                // addFallEntry(fireUser.getUid(),  "06:48 PM", "01/05/24", 15, 92, "Front", 2.6);
 
             }
 
