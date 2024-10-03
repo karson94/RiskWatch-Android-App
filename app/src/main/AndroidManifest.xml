@@ -23,6 +23,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RiskWatch"
         tools:targetApi="34">
+        <service android:name=".BluetoothService" />
         <activity
             android:name=".LoginScreen"
             android:exported="false" />
