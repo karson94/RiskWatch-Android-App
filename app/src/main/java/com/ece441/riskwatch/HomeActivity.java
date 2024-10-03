@@ -62,9 +62,6 @@ public class HomeActivity extends AppCompatActivity {
 
     boolean startup = true;
 
-    private static final String CHANNEL_ID = "fall_notification_channel";
-    private static final int NOTIFICATION_ID = 123;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -101,7 +98,7 @@ public class HomeActivity extends AppCompatActivity {
                 }
 
                 // Add a fall entry for user as a test to ensure we can store a fall for them
-//                addFallEntry(fireUser.getUid(),  "06:48 PM", "01/05/24", 15, 92, "Front", 2.6);
+                // addFallEntry(fireUser.getUid(),  "06:48 PM", "01/05/24", 15, 92, "Front", 2.6);
 
             }
 
@@ -142,44 +139,6 @@ public class HomeActivity extends AppCompatActivity {
     public void notifyFallToast(Context context/*, String fallTime String fallData, String fallDirection*/) {
         String notif = "Fall detected";
         Toast.makeText(context, notif, Toast.LENGTH_LONG).show();
-    }
-
-    // WIP
-    // Trigger device banner notification
-    private void notifyFallBanner(Context context, String time, String date, String fallDirection) {
-        Log.d(TAG, "Inside notifyFallBanner now");
-        // Create a notification channel if Android version is Oreo or above
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            CharSequence name = "Fall Notification";
-            String description = "Channel for fall notifications";
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
-            channel.setDescription(description);
-
-            NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
-        }
-
-        // Create the notification
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification_icon)
-                .setContentTitle("Fall Detected")
-                .setContentText("A fall occurred at " + time + " on " + date + ". Direction: " + fallDirection)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
-
-        // Show the notification
-        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
-        }
-        notificationManager.notify(NOTIFICATION_ID, builder.build());
     }
 
     // Logs current user out of the application, take user back to login screen
@@ -319,8 +278,6 @@ public class HomeActivity extends AppCompatActivity {
                         fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
                         fallItemAdapter.notifyItemInserted(0);
                         recyclerView.scrollToPosition(0);
-
-                        notifyFallBanner(HomeActivity.this, "Now", "Today", "Wherever");
 
                         if (!startup) {
 //                            notifyFallToast(HomeActivity.this);
