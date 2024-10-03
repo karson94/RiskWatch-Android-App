@@ -141,8 +141,6 @@ public class HomeActivity extends AppCompatActivity {
         Toast.makeText(context, notif, Toast.LENGTH_LONG).show();
     }
 
-    // Banner notif here
-
     // Logs current user out of the application, take user back to login screen
     public void logOut(View view) {
         Intent intent = new Intent(this, LoginScreen.class);
