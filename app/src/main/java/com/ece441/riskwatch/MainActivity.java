@@ -45,6 +45,15 @@ public class MainActivity extends ComponentActivity {
                     // Permission denied, handle accordingly (e.g., show a message)
                 }
             });
+    private final ActivityResultLauncher<String[]> requestBluetoothPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.BLUETOOTH_CONNECT) &&
+                        isGranted.get(Manifest.permission.BLUETOOTH_SCAN)) {
+                    // Permissions granted, proceed with Bluetooth functionality
+                } else {
+                    // Permissions denied, handle accordingly
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,6 +62,7 @@ public class MainActivity extends ComponentActivity {
         Intent intent = new Intent(MainActivity.this, LoginScreen.class);
         startActivity(intent);
         checkNotificationPermission();
+        checkBluetoothPermissions();
     }
 
     // Request notification permissions
@@ -62,6 +72,18 @@ public class MainActivity extends ComponentActivity {
             requestPermissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
         } else {
             // Permission already granted, proceed with your app logic
+        }
+    }
+
+    private void checkBluetoothPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            requestBluetoothPermissionLauncher.launch(new String[]{
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN
+            });
+        } else {
+            // Permissions already granted
         }
     }
 }
