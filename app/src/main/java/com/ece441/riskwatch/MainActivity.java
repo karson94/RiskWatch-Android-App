@@ -54,6 +54,15 @@ public class MainActivity extends ComponentActivity {
                     // Permissions denied, handle accordingly
                 }
             });
+    private final ActivityResultLauncher<String[]> requestLocationPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                        isGranted.get(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    // Location permissions granted
+                } else {
+                    // Location permissions denied
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,15 +72,27 @@ public class MainActivity extends ComponentActivity {
         startActivity(intent);
         checkNotificationPermission();
         checkBluetoothPermissions();
+        checkLocationPermissions();
     }
 
-    // Request notification permissions
     private void checkNotificationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             // Request the permission using the ActivityResultLauncher
             requestPermissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
         } else {
             // Permission already granted, proceed with your app logic
+        }
+    }
+
+    private void checkLocationPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestLocationPermissionLauncher.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            });
+        } else {
+            // Location permissions already granted
         }
     }
 
