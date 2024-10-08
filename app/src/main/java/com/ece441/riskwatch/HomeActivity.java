@@ -52,6 +52,8 @@ import java.util.Map;
 
 import java.util.Random;
 
+import com.ece441.riskwatch.BluetoothTestActivity;
+
 public class HomeActivity extends AppCompatActivity {
 
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
@@ -313,5 +315,11 @@ public class HomeActivity extends AppCompatActivity {
         // Write the user name to the database under the specified user ID
         assert userId != null;
         usersRef.child(userId).child("name").setValue(userName);
+    }
+
+    // Bluetooth test page
+    public void openBluetoothTest(View view) {
+        Intent intent = new Intent(this, BluetoothTestActivity.class);
+        startActivity(intent);
     }
 }
