@@ -44,8 +44,10 @@
         android:padding="15dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="1.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/batteryLevel" />
+        app:layout_constraintTop_toBottomOf="@+id/batteryLevel"
+        app:layout_constraintVertical_bias="1.0" />
 
     <ImageView
         android:id="@+id/imageView7"
@@ -61,65 +63,66 @@
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@drawable/riskwatch_logov4" />
 
-    <Button
-        android:id="@+id/logOutButton"
-        android:layout_width="55dp"
-        android:layout_height="35dp"
-        android:fontFamily="@font/share_tech_mono"
-        android:onClick="logOut"
-        android:padding="0dp"
-        android:text="@string/log_out"
-        android:textSize="10sp"
-        android:textColor="#FFF9FDFF"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView7"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias=".5"
-        app:layout_constraintStart_toEndOf="@+id/riskWatchText"
-        app:layout_constraintTop_toBottomOf="@+id/userNameView"
-        app:layout_constraintVertical_bias="0.25"
-        tools:ignore="SmallSp" />
-
     <TextView
         android:id="@+id/userNameView"
-        android:layout_width="80dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="16dp"
         android:fontFamily="@font/share_tech_mono"
         android:text="@string/hi_user"
         android:textAlignment="center"
         android:textColor="@color/colorPrimaryDark"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/riskWatchText"
+        app:layout_constraintEnd_toStartOf="@+id/logOutButton"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <Button
+        android:id="@+id/logOutButton"
+        android:layout_width="44dp"
+        android:layout_height="27dp"
+        android:layout_marginEnd="24dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:onClick="logOut"
+        android:padding="0dp"
+        android:text="@string/log_out"
+        android:textColor="#FFF9FDFF"
+        android:textSize="10sp"
+        app:layout_constraintBottom_toBottomOf="@+id/userNameView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/userNameView"
+        app:layout_constraintVertical_bias="0.0"
+        tools:ignore="SmallSp" />
+
+    <!-- Bluetooth Test Button -->
     <Button
         android:id="@+id/linkButton"
         android:layout_width="55dp"
         android:layout_height="35dp"
         android:layout_marginTop="8dp"
-        android:layout_marginBottom="12dp"
         android:fontFamily="@font/share_tech_mono"
         android:onClick="accountLink"
         android:padding="0dp"
         android:text="@string/account_linking"
-        android:textSize="10sp"
         android:textColor="#FFF9FDFF"
-        app:layout_constraintBottom_toTopOf="@+id/fallRecycler"
+        android:textSize="10sp"
         app:layout_constraintEnd_toEndOf="@+id/logOutButton"
-        app:layout_constraintStart_toStartOf="@+id/logOutButton"
         app:layout_constraintTop_toBottomOf="@+id/logOutButton"
         tools:ignore="SmallSp" />
 
     <Button
-        android:id="@+id/addFall"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
+        android:id="@+id/bluetoothTestButton"
+        android:layout_width="55dp"
+        android:layout_height="35dp"
+        android:layout_marginTop="4dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:onClick="openBluetoothTest"
+        android:padding="0dp"
+        android:text="BT Test"
         android:textColor="#FFF9FDFF"
-        android:onClick="addRandFall"
-        android:text="@string/add_fall"
-        app:layout_constraintBottom_toBottomOf="@+id/fallRecycler"
-        app:layout_constraintEnd_toEndOf="parent" />
+        android:textSize="10sp"
+        app:layout_constraintEnd_toEndOf="@+id/linkButton"
+        app:layout_constraintTop_toBottomOf="@+id/linkButton"
+        tools:ignore="SmallSp,HardcodedText" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
