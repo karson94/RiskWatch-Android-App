@@ -282,8 +282,7 @@ public class HomeActivity extends AppCompatActivity {
                         recyclerView.scrollToPosition(0);
 
                         if (!startup) {
-//                            notifyFallToast(HomeActivity.this);
-
+                        // notifyFallToast(HomeActivity.this);
                         }
                     }
                 }
