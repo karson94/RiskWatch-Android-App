@@ -76,9 +76,7 @@ public class BluetoothTestActivity extends AppCompatActivity {
         backButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(BluetoothTestActivity.this, HomeActivity.class); // Replace HomeActivity with your actual home activity class
-                startActivity(intent);
-                finish(); // Optional: Finish the current activity
+                finish();
             }
         });
     }

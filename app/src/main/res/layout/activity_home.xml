@@ -93,7 +93,6 @@
         app:layout_constraintVertical_bias="0.0"
         tools:ignore="SmallSp" />
 
-    <!-- Bluetooth Test Button -->
     <Button
         android:id="@+id/linkButton"
         android:layout_width="55dp"
@@ -109,6 +108,7 @@
         app:layout_constraintTop_toBottomOf="@+id/logOutButton"
         tools:ignore="SmallSp" />
 
+    <!-- Bluetooth Test Button -->
     <Button
         android:id="@+id/bluetoothTestButton"
         android:layout_width="55dp"
