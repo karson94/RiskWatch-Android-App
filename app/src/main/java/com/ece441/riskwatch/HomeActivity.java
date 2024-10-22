@@ -52,8 +52,6 @@ import java.util.Map;
 
 import java.util.Random;
 
-import com.ece441.riskwatch.BluetoothTestActivity;
-
 public class HomeActivity extends AppCompatActivity {
 
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
@@ -316,9 +314,9 @@ public class HomeActivity extends AppCompatActivity {
         usersRef.child(userId).child("name").setValue(userName);
     }
 
-    // Bluetooth test page
-    public void openBluetoothTest(View view) {
-        Intent intent = new Intent(this, BluetoothTestActivity.class);
+    // Bluetooth
+    public void openBlunoActivity(View view) {
+        Intent intent = new Intent(this, BlunoActivity.class);
         startActivity(intent);
     }
 }
