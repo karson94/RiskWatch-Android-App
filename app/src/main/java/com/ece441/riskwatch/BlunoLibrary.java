@@ -80,7 +80,7 @@ public abstract class BlunoLibrary extends Activity {
     private ArrayList<ArrayList<BluetoothGattCharacteristic>> mGattCharacteristics = new ArrayList<>();
     private LeDeviceListAdapter mLeDeviceListAdapter = null;
     private BluetoothAdapter mBluetoothAdapter;
-    private boolean mScanning = false;
+    protected boolean mScanning = false;
     AlertDialog mScanDeviceDialog;
     private String mDeviceName;
     private String mDeviceAddress;
@@ -318,29 +318,41 @@ public abstract class BlunoLibrary extends Activity {
         }
     }
 
-    void scanLeDevice(final boolean enable) {
+    protected void scanLeDevice(final boolean enable) {
         if (enable) {
-            System.out.println("mBluetoothAdapter.startLeScan");
-            
-            if (mLeDeviceListAdapter != null) {
-                mLeDeviceListAdapter.clear();
-                mLeDeviceListAdapter.notifyDataSetChanged();
-            }
-            
-            if (!mScanning) {
-                mScanning = true;
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
-                    mBluetoothAdapter.startLeScan(mLeScanCallback);
-                } else {
-                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_SCAN}, REQUEST_ENABLE_BT);
-                }
-            }
-        } else {
-            if (mScanning) {
+            mHandler.postDelayed(() -> {
                 mScanning = false;
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
-                    mBluetoothAdapter.stopLeScan(mLeScanCallback);
-                }
+                stopBluetoothLeScan();
+                onConectionStateChange(connectionStateEnum.isToScan);
+            }, SCAN_PERIOD);
+
+            mScanning = true;
+            startBluetoothLeScan();
+            onConectionStateChange(connectionStateEnum.isScanning);
+        } else {
+            mScanning = false;
+            stopBluetoothLeScan();
+            onConectionStateChange(connectionStateEnum.isToScan);
+        }
+    }
+
+    private void startBluetoothLeScan() {
+        if (checkBluetoothPermissions()) {
+            try {
+                mBluetoothAdapter.startLeScan(mLeScanCallback);
+            } catch (SecurityException e) {
+                Log.e(TAG, "SecurityException when starting BLE scan", e);
+                Toast.makeText(this, "Bluetooth permission is required", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void stopBluetoothLeScan() {
+        if (checkBluetoothPermissions()) {
+            try {
+                mBluetoothAdapter.stopLeScan(mLeScanCallback);
+            } catch (SecurityException e) {
+                Log.e(TAG, "SecurityException when stopping BLE scan", e);
             }
         }
     }
@@ -366,14 +378,19 @@ public abstract class BlunoLibrary extends Activity {
     private final BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
         @Override
         public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    System.out.println("mLeScanCallback onLeScan run ");
-                    mLeDeviceListAdapter.addDevice(device);
-                    mLeDeviceListAdapter.notifyDataSetChanged();
+            runOnUiThread(() -> {
+                if (checkBluetoothPermissions()) {
+                    try {
+                        String deviceInfo = device.getName() + "\n" + device.getAddress();
+                        mLeDeviceListAdapter.addDevice(device);
+                        mLeDeviceListAdapter.notifyDataSetChanged();
+                    } catch (SecurityException e) {
+                        Log.e(TAG, "SecurityException when accessing device information", e);
+                    }
                 }
             });
+            // Call the abstract method
+            BlunoLibrary.this.onLeScan(device, rssi, scanRecord);
         }
     };
 
@@ -483,12 +500,23 @@ public abstract class BlunoLibrary extends Activity {
             }
 
             BluetoothDevice device = mLeDevices.get(i);
-            final String deviceName = device.getName();
-            if (deviceName != null && deviceName.length() > 0)
-                viewHolder.deviceName.setText(deviceName);
-            else
+            if (checkBluetoothPermissions()) {
+                try {
+                    final String deviceName = device.getName();
+                    if (deviceName != null && deviceName.length() > 0)
+                        viewHolder.deviceName.setText(deviceName);
+                    else
+                        viewHolder.deviceName.setText(R.string.unknown_device);
+                    viewHolder.deviceAddress.setText(device.getAddress());
+                } catch (SecurityException e) {
+                    Log.e(TAG, "SecurityException when accessing device information", e);
+                    viewHolder.deviceName.setText(R.string.unknown_device);
+                    viewHolder.deviceAddress.setText(R.string.unknown_address);
+                }
+            } else {
                 viewHolder.deviceName.setText(R.string.unknown_device);
-            viewHolder.deviceAddress.setText(device.getAddress());
+                viewHolder.deviceAddress.setText(R.string.unknown_address);
+            }
 
             return view;
         }
@@ -624,4 +652,22 @@ public abstract class BlunoLibrary extends Activity {
     private BroadcastReceiver mBroadcastReceiver;
 
     private static final int RECEIVER_NOT_EXPORTED = Context.RECEIVER_NOT_EXPORTED;
+
+    private static final long SCAN_PERIOD = 10000; // 10 seconds
+
+    protected void connect(final String address) {
+        if (mBluetoothAdapter == null || address == null) {
+            return;
+        }
+
+        final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+        if (device == null) {
+            return;
+        }
+
+        mBluetoothLeService.connect(address);
+        onConectionStateChange(connectionStateEnum.isConnecting);
+    }
+
+    public abstract void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord);
 }
