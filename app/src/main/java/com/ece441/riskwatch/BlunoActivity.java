@@ -10,12 +10,16 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ArrayAdapter;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
+import android.content.Context;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class BlunoActivity extends BlunoLibrary {
     private Button buttonScan;
+    private Button buttonReset;
     private Button buttonSerialSend;
     private EditText serialSendText;
     private TextView serialReceivedText;
@@ -68,6 +72,39 @@ public class BlunoActivity extends BlunoLibrary {
                 scanLeDevice(true);
             }
         });
+
+        buttonReset = findViewById(R.id.buttonReset);
+        buttonReset.setOnClickListener(v -> resetBluetooth());
+    }
+
+    private void resetBluetooth() {
+        // Stop scanning if scanning
+        if (isScanning()) {
+            scanLeDevice(false);
+        }
+
+        // Disconnect if connected
+        if (mConnectionState == connectionStateEnum.isConnected) {
+            serialSend("AT+DISC");  // Send disconnect command to Bluno
+            mBluetoothLeService.disconnect();
+        }
+
+        // Clear the device list
+        listAdapter.clear();
+        listAdapter.notifyDataSetChanged();
+
+        // Clear the received text
+        serialReceivedText.setText("");
+
+        // Reset the scan button text
+        buttonScan.setText(R.string.scan);
+
+        // Reset the connection state
+        mConnectionState = connectionStateEnum.isToScan;
+
+        // Optionally, you can add any other reset logic here
+
+        Toast.makeText(this, "Bluetooth reset", Toast.LENGTH_SHORT).show();
     }
 
     @Override
