@@ -91,6 +91,13 @@ public class BluetoothLeService extends Service {
                 Log.i(TAG, "Connected to GATT server.");
                 // Now you can safely find the characteristics and set the baud rate.
                 findBlunoCharacteristic();
+
+                // Introduce a delay before discovering services
+                mHandler.postDelayed(() -> {
+                    if (mBluetoothGatt != null) {
+                        mBluetoothGatt.discoverServices();
+                    }
+                }, 1000); // Delay for 1 second (adjust as needed)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 mConnectionState = STATE_DISCONNECTED;
                 broadcastUpdate(ACTION_GATT_DISCONNECTED);
@@ -321,5 +328,15 @@ public class BluetoothLeService extends Service {
             mMtuSize = mtuSize;
             mBluetoothGatt.requestMtu(mtuSize);
         }
+    }
+
+    private Handler mHandler; // Add this line
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        // ... (Existing code) ...
+
+        mHandler = new Handler(getMainLooper()); // Initialize the Handler 
     }
 }
