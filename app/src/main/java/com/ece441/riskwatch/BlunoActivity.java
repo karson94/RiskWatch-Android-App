@@ -1,13 +1,17 @@
 package com.ece441.riskwatch;
 
+import android.bluetooth.BluetoothDevice;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ArrayAdapter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class BlunoActivity extends BlunoLibrary {
@@ -15,6 +19,8 @@ public class BlunoActivity extends BlunoLibrary {
     private Button buttonSerialSend;
     private EditText serialSendText;
     private TextView serialReceivedText;
+    private ListView listViewDevices;
+    private ArrayAdapter<String> listAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,43 +47,82 @@ public class BlunoActivity extends BlunoLibrary {
         buttonSerialSend = findViewById(R.id.buttonSerialSend);
         buttonSerialSend.setOnClickListener(v -> serialSend(serialSendText.getText().toString()));
 
+        listViewDevices = findViewById(R.id.listViewDevices);
+        listAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        listViewDevices.setAdapter(listAdapter);
+        listViewDevices.setOnItemClickListener((parent, view, position, id) -> {
+            String deviceInfo = (String) parent.getItemAtPosition(position);
+            String[] parts = deviceInfo.split("\n");
+            if (parts.length > 1) {
+                String deviceAddress = parts[1];
+                connect(deviceAddress);
+            }
+        });
+
         buttonScan = findViewById(R.id.buttonScan);
-        buttonScan.setOnClickListener(v -> buttonScanOnClickProcess());
+        buttonScan.setOnClickListener(v -> {
+            if (isScanning()) {
+                scanLeDevice(false);
+            } else {
+                listAdapter.clear();
+                scanLeDevice(true);
+            }
+        });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         System.out.println("BlunoActivity onResume");
-        // Any additional BlunoActivity-specific onResume code can go here
     }
 
     @Override
     public void onConectionStateChange(connectionStateEnum theConnectionState) {
-        switch (theConnectionState) {
-            case isConnected:
-                buttonScan.setText(R.string.connected);
-                break;
-            case isConnecting:
-                buttonScan.setText(R.string.connecting);
-                break;
-            case isToScan:
-                buttonScan.setText(R.string.scan);
-                break;
-            case isScanning:
-                buttonScan.setText(R.string.scanning);
-                break;
-            case isDisconnecting:
-                buttonScan.setText(R.string.disconnecting);
-                break;
-            default:
-                break;
-        }
+        runOnUiThread(() -> {
+            switch (theConnectionState) {
+                case isConnected:
+                    buttonScan.setText(R.string.connected);
+                    break;
+                case isConnecting:
+                    buttonScan.setText(R.string.connecting);
+                    break;
+                case isToScan:
+                    buttonScan.setText(R.string.scan);
+                    break;
+                case isScanning:
+                    buttonScan.setText(R.string.scanning);
+                    break;
+                case isDisconnecting:
+                    buttonScan.setText(R.string.disconnecting);
+                    break;
+                default:
+                    break;
+            }
+        });
     }
 
     @Override
     public void onSerialReceived(String theString) {
-        serialReceivedText.append(theString);
-        ((ScrollView) serialReceivedText.getParent()).fullScroll(View.FOCUS_DOWN);
+        runOnUiThread(() -> {
+            serialReceivedText.append(theString);
+            ((ScrollView) serialReceivedText.getParent()).fullScroll(View.FOCUS_DOWN);
+        });
+    }
+
+    @Override
+    public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
+        runOnUiThread(() -> {
+            if (checkBluetoothPermissions()) {
+                String deviceInfo = device.getName() + "\n" + device.getAddress();
+                if (listAdapter.getPosition(deviceInfo) == -1) {
+                    listAdapter.add(deviceInfo);
+                    listAdapter.notifyDataSetChanged();
+                }
+            }
+        });
+    }
+
+    private boolean isScanning() {
+        return mScanning;
     }
 }
