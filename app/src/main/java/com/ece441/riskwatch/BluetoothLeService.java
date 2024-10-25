@@ -34,6 +34,7 @@ import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+import android.os.Handler;
 
 import java.util.List;
 import java.util.UUID;
@@ -67,34 +68,42 @@ public class BluetoothLeService extends Service {
     public final static String EXTRA_DATA =
             "com.ece441.riskwatch.EXTRA_DATA";
 
-    public final static UUID UUID_HEART_RATE_MEASUREMENT =
-            UUID.fromString("00002a37-0000-1000-8000-00805f9b34fb");
+    // Bluno UUIDs (make sure these are correct for your Bluno model)
+    public static final UUID BLUNO_SERVICE_UUID = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb");
+    public static final UUID BLUNO_WRITE_CHARACTERISTIC_UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb");
+    public static final UUID BLUNO_READ_CHARACTERISTIC_UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb");
+
+    private BluetoothGattCharacteristic mWriteCharacteristic;
+    private BluetoothGattCharacteristic mReadCharacteristic;
 
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            String intentAction;
+            super.onConnectionStateChange(gatt, status, newState);
+
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                intentAction = ACTION_GATT_CONNECTED;
                 mConnectionState = STATE_CONNECTED;
-                broadcastUpdate(intentAction);
+                broadcastUpdate(ACTION_GATT_CONNECTED);
                 Log.i(TAG, "Connected to GATT server.");
-                Log.i(TAG, "Attempting to start service discovery:" +
-                        mBluetoothGatt.discoverServices());
+                // Now you can safely find the characteristics and set the baud rate.
+                findBlunoCharacteristic();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                intentAction = ACTION_GATT_DISCONNECTED;
                 mConnectionState = STATE_DISCONNECTED;
+                broadcastUpdate(ACTION_GATT_DISCONNECTED);
                 Log.i(TAG, "Disconnected from GATT server.");
-                broadcastUpdate(intentAction);
             }
         }
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i(TAG, "onServicesDiscovered: Services discovered successfully");
                 broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
+                // Find the Bluno service and characteristic after service discovery
+                findBlunoCharacteristic();
             } else {
-                Log.w(TAG, "onServicesDiscovered received: " + status);
+                Log.w(TAG, "onServicesDiscovered received error: " + status);
+                // Handle service discovery errors here
             }
         }
 
@@ -104,6 +113,22 @@ public class BluetoothLeService extends Service {
                                          int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+            } else {
+                // Handle characteristic read errors here
+                Log.e(TAG, "Error reading characteristic: " + status);
+            }
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "Characteristic written successfully");
+                // If this was a baud rate setting, log it
+                if (characteristic.getUuid().equals(BLUNO_WRITE_CHARACTERISTIC_UUID)) {
+                    Log.d(TAG, "Baud rate set successfully.");
+                }
+            } else {
+                Log.e(TAG, "Error writing characteristic: " + status);
             }
         }
 
@@ -123,27 +148,12 @@ public class BluetoothLeService extends Service {
                                  final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
 
-        if (UUID_HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) {
-            int flag = characteristic.getProperties();
-            int format = -1;
-            if ((flag & 0x01) != 0) {
-                format = BluetoothGattCharacteristic.FORMAT_UINT16;
-                Log.d(TAG, "Heart rate format UINT16.");
-            } else {
-                format = BluetoothGattCharacteristic.FORMAT_UINT8;
-                Log.d(TAG, "Heart rate format UINT8.");
-            }
-            final int heartRate = characteristic.getIntValue(format, 1);
-            Log.d(TAG, String.format("Received heart rate: %d", heartRate));
-            intent.putExtra(EXTRA_DATA, String.valueOf(heartRate));
-        } else {
-            final byte[] data = characteristic.getValue();
-            if (data != null && data.length > 0) {
-                final StringBuilder stringBuilder = new StringBuilder(data.length);
-                for(byte byteChar : data)
-                    stringBuilder.append(String.format("%02X ", byteChar));
-                intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
-            }
+        final byte[] data = characteristic.getValue();
+        if (data != null && data.length > 0) {
+            final StringBuilder stringBuilder = new StringBuilder(data.length);
+            for(byte byteChar : data)
+                stringBuilder.append(String.format("%02X ", byteChar));
+            intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
         }
         sendBroadcast(intent);
     }
@@ -191,13 +201,9 @@ public class BluetoothLeService extends Service {
             return false;
         }
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            Log.w(TAG, "Bluetooth connect permission not granted");
-            return false;
-        }
-
-        // Previous device; try to reconnect
-        if (mBluetoothDeviceAddress != null && address.equals(mBluetoothDeviceAddress) && mBluetoothGatt != null) {
+        // Previously connected device.  Try to reconnect.
+        if (mBluetoothDeviceAddress != null && address.equals(mBluetoothDeviceAddress)
+                && mBluetoothGatt != null) {
             Log.d(TAG, "Trying to use an existing mBluetoothGatt for connection.");
             if (mBluetoothGatt.connect()) {
                 mConnectionState = STATE_CONNECTING;
@@ -218,6 +224,15 @@ public class BluetoothLeService extends Service {
         Log.d(TAG, "Trying to create a new connection.");
         mBluetoothDeviceAddress = address;
         mConnectionState = STATE_CONNECTING;
+        
+        // ADD THE FOLLOWING LINES:
+        Handler handler = new Handler();
+        handler.postDelayed(() -> {
+            if (mBluetoothGatt != null) {
+                mBluetoothGatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+            }
+        }, 500); // Adjust delay if needed
+
         return true;
     }
 
@@ -252,13 +267,6 @@ public class BluetoothLeService extends Service {
             return;
         }
         mBluetoothGatt.setCharacteristicNotification(characteristic, enabled);
-
-        if (UUID_HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) {
-            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(
-                    UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"));
-            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-            mBluetoothGatt.writeDescriptor(descriptor);
-        }
     }
 
     public List<BluetoothGattService> getSupportedGattServices() {
@@ -272,5 +280,31 @@ public class BluetoothLeService extends Service {
             return;
         }
         mBluetoothGatt.writeCharacteristic(characteristic);
+    }
+
+    // Method to find the Bluno characteristic for writing
+    private void findBlunoCharacteristic() {
+        BluetoothGattService blunoService = mBluetoothGatt.getService(BLUNO_SERVICE_UUID);
+        if (blunoService != null) {
+            mWriteCharacteristic = blunoService.getCharacteristic(BLUNO_WRITE_CHARACTERISTIC_UUID);
+            mReadCharacteristic = blunoService.getCharacteristic(BLUNO_READ_CHARACTERISTIC_UUID);
+            if (mWriteCharacteristic != null && mReadCharacteristic != null) {
+                // Baud rate setting removed as it's not relevant to connection establishment
+            } else {
+                Log.w(TAG, "Bluno write or read characteristic not found");
+            }
+        } else {
+            Log.w(TAG, "Bluno service not found");
+        }
+    }
+
+    public void setBaudRate(int baudRate) {
+        if (mWriteCharacteristic == null) {
+            Log.e(TAG, "Write characteristic not found");
+            return;
+        }
+        String command = String.format("AT+BAUD=%d", baudRate);
+        mWriteCharacteristic.setValue(command.getBytes());
+        writeCharacteristic(mWriteCharacteristic);
     }
 }
