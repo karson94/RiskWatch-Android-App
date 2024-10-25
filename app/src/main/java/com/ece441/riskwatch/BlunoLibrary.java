@@ -32,7 +32,7 @@ public abstract class BlunoLibrary extends Activity {
     protected BluetoothAdapter mBluetoothAdapter;
     protected BluetoothLeService mBluetoothLeService;
     private BluetoothGattCharacteristic mSCharacteristic;
-    private boolean mConnected = false;
+    protected boolean mConnected = false;
     private String mDeviceAddress;
 
     protected static final int REQUEST_ENABLE_BT = 1;
@@ -42,7 +42,7 @@ public abstract class BlunoLibrary extends Activity {
 
     private static final String TAG = BlunoLibrary.class.getSimpleName();
 
-    public abstract void onConectionStateChange(connectionStateEnum theConnectionState);
+    public abstract void onConectionStateChange(final connectionStateEnum theConnectionState);
     public abstract void onSerialReceived(String theString);
 
     public BlunoLibrary() {
@@ -118,7 +118,8 @@ public abstract class BlunoLibrary extends Activity {
             if (!mBluetoothLeService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
                 finish();
-            }
+            } 
+            // The line below was removed to prevent immediate disconnection
         }
 
         @Override
@@ -212,18 +213,29 @@ public abstract class BlunoLibrary extends Activity {
     protected abstract void onDeviceDiscovered(BluetoothDevice device);
 
     public void connect(String address) {
-        if (mBluetoothAdapter == null || address == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized or unspecified address.");
+        if (mBluetoothAdapter == null || address == null || mBluetoothLeService == null) {
+            Log.e(TAG, "Bluetooth not initialized, address missing, or BluetoothLeService is null.");
             return;
         }
 
         mDeviceAddress = address;
         mConnectionState = connectionStateEnum.isConnecting;
         onConectionStateChange(mConnectionState);
-        mBluetoothLeService.connect(mDeviceAddress);
+        Log.d(TAG, "Attempting to connect to " + address + ". Connection state: " + mConnectionState);
+
+        // Attempt connection
+        mBluetoothLeService.connect(address);
     }
 
     public void disconnect() {
         mBluetoothLeService.disconnect();
+    }
+
+    public void serialBegin(int baudRate) {
+        if (mBluetoothLeService != null && mConnectionState == connectionStateEnum.isConnected) {
+            mBluetoothLeService.setBaudRate(baudRate);
+        } else {
+            Log.e(TAG, "Error: BluetoothLeService is null or not connected.");
+        }
     }
 }

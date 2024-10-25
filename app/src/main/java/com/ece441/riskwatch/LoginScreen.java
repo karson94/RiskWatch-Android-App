@@ -86,8 +86,10 @@ public class LoginScreen extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void guestLogin(View view) {
+        Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+        intent.putExtra("user", "Guest");
+        startActivity(intent);
+    }
+
 }
-
-
-
-
