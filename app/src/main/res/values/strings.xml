@@ -26,4 +26,12 @@
     <string name="textview">TextView</string>
     <string name="account_linking">Account Linking</string>
     <string name="error_bluetooth_not_supported">Bluetooth LE is not supported on this device</string>
+    <string name="unknown_device">Unknown device</string>
+    <string name="permissions_granted">Permissions granted</string>
+    <string name="permissions_denied">Permissions denied</string>
+    <string name="connected">Connected</string>
+    <string name="connecting">Connecting</string>
+    <string name="scan">Scan</string>
+    <string name="scanning">Scanning</string>
+    <string name="disconnecting">Disconnecting</string>
 </resources>

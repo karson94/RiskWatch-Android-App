@@ -67,6 +67,10 @@ public class BluetoothLeService extends Service {
             "com.ece441.riskwatch.ACTION_DATA_AVAILABLE";
     public final static String EXTRA_DATA =
             "com.ece441.riskwatch.EXTRA_DATA";
+    public final static String ACTION_DATA_WRITE_SUCCESS =
+            "com.ece441.riskwatch.ACTION_DATA_WRITE_SUCCESS";
+    public final static String ACTION_DATA_WRITE_FAILURE =
+            "com.ece441.riskwatch.ACTION_DATA_WRITE_FAILURE";
 
     // Bluno UUIDs (make sure these are correct for your Bluno model)
     public static final UUID BLUNO_SERVICE_UUID = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb");
@@ -127,8 +131,10 @@ public class BluetoothLeService extends Service {
                 if (characteristic.getUuid().equals(BLUNO_WRITE_CHARACTERISTIC_UUID)) {
                     Log.d(TAG, "Baud rate set successfully.");
                 }
+                broadcastUpdate(ACTION_DATA_WRITE_SUCCESS);
             } else {
                 Log.e(TAG, "Error writing characteristic: " + status);
+                broadcastUpdate(ACTION_DATA_WRITE_FAILURE);
             }
         }
 
@@ -136,6 +142,16 @@ public class BluetoothLeService extends Service {
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
             broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+        }
+
+        @Override
+        public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                mMtuSize = mtu;
+                Log.i(TAG, "MTU size changed to: " + mMtuSize);
+            } else {
+                Log.w(TAG, "MTU change failed: " + status);
+            }
         }
     };
 
@@ -226,12 +242,15 @@ public class BluetoothLeService extends Service {
         mConnectionState = STATE_CONNECTING;
         
         // ADD THE FOLLOWING LINES:
+        // After connection is established, request a higher connection priority
+        // This can improve data transfer speeds, especially for applications
+        // that require frequent or large data transfers.
         Handler handler = new Handler();
         handler.postDelayed(() -> {
             if (mBluetoothGatt != null) {
                 mBluetoothGatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
             }
-        }, 500); // Adjust delay if needed
+        }, 500); // Adjust delay if needed (in milliseconds)
 
         return true;
     }
@@ -279,7 +298,12 @@ public class BluetoothLeService extends Service {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
         }
-        mBluetoothGatt.writeCharacteristic(characteristic);
+        
+        if (mBluetoothGatt.writeCharacteristic(characteristic)) {
+            System.out.println("writeCharacteristic init " + new String(characteristic.getValue()) + ":success");
+        } else {
+            System.out.println("writeCharacteristic init " + new String(characteristic.getValue()) + ":failure");
+        }
     }
 
     // Method to find the Bluno characteristic for writing
@@ -306,5 +330,14 @@ public class BluetoothLeService extends Service {
         String command = String.format("AT+BAUD=%d", baudRate);
         mWriteCharacteristic.setValue(command.getBytes());
         writeCharacteristic(mWriteCharacteristic);
+    }
+
+    private int mMtuSize = 23; // Default MTU size
+
+    public void exchangeMtu(int mtuSize) {
+        if (mBluetoothGatt != null) {
+            mMtuSize = mtuSize;
+            mBluetoothGatt.requestMtu(mtuSize);
+        }
     }
 }
