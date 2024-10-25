@@ -18,11 +18,10 @@
             android:text="Scan" />
 
         <Button
-            android:id="@+id/buttonReload"
+            android:id="@+id/buttonSerialSend"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Reload"
-            android:visibility="gone" />
+            android:text="Send" />
     </LinearLayout>
 
     <ListView
@@ -31,20 +30,26 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <TextView
-        android:id="@+id/textViewData"
+    <EditText
+        android:id="@+id/serialSendText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:hint="Enter text to send"
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:text="Received Data:"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"/>
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="100dp">
+        android:layout_height="150dp">
 
         <TextView
-            android:id="@+id/textViewReceivedData"
+            android:id="@+id/serialReceivedText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
     </ScrollView>
