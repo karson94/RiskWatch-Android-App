@@ -83,25 +83,19 @@ public class BluetoothLeService extends Service {
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            super.onConnectionStateChange(gatt, status, newState);
-
+            String intentAction;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                intentAction = ACTION_GATT_CONNECTED;
                 mConnectionState = STATE_CONNECTED;
-                broadcastUpdate(ACTION_GATT_CONNECTED);
+                broadcastUpdate(intentAction);
                 Log.i(TAG, "Connected to GATT server.");
-                // Now you can safely find the characteristics and set the baud rate.
-                findBlunoCharacteristic();
-
-                // Introduce a delay before discovering services
-                mHandler.postDelayed(() -> {
-                    if (mBluetoothGatt != null) {
-                        mBluetoothGatt.discoverServices();
-                    }
-                }, 1000); // Delay for 1 second (adjust as needed)
+                Log.i(TAG, "Attempting to start service discovery:" +
+                        mBluetoothGatt.discoverServices());
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                intentAction = ACTION_GATT_DISCONNECTED;
                 mConnectionState = STATE_DISCONNECTED;
-                broadcastUpdate(ACTION_GATT_DISCONNECTED);
                 Log.i(TAG, "Disconnected from GATT server.");
+                broadcastUpdate(intentAction);
             }
         }
 
