@@ -257,10 +257,12 @@ public abstract class BlunoLibrary extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
-            System.out.println("mGattUpdateReceiver->onReceive->action=" + action);
+            Log.d(TAG, "mGattUpdateReceiver->onReceive->action=" + action);
+            
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
                 mConnected = true;
                 mHandler.removeCallbacks(mConnectingOverTimeRunnable);
+                // Don't change connection state yet - wait for services discovery
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 mConnected = false;
                 mConnectionState = connectionStateEnum.isToScan;
@@ -268,6 +270,9 @@ public abstract class BlunoLibrary extends Activity {
                 mHandler.removeCallbacks(mDisonnectingOverTimeRunnable);
                 mBluetoothLeService.close();
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
+                // Only change connection state after services are discovered
+                mConnectionState = connectionStateEnum.isConnected;
+                onConectionStateChange(mConnectionState);
                 getGattServices(mBluetoothLeService.getSupportedGattServices());
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
                 if (mSCharacteristic == mModelNumberCharacteristic) {

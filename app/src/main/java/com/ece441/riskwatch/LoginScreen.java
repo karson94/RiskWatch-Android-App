@@ -87,9 +87,23 @@ public class LoginScreen extends AppCompatActivity {
     }
 
     public void guestLogin(View view) {
-        Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
-        intent.putExtra("user", "Guest");
-        startActivity(intent);
+        Log.d(TAG, "guestLogin() started");
+        mAuth.signInAnonymously()
+            .addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    // Sign in success
+                    Log.d(TAG, "signInAnonymously:success");
+                    Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+                    intent.putExtra("user", "Guest");
+                    intent.putExtra("isGuest", true);
+                    startActivity(intent);
+                } else {
+                    // If sign in fails, display a message to the user
+                    Log.w(TAG, "signInAnonymously:failure", task.getException());
+                    Toast.makeText(LoginScreen.this, "Anonymous authentication failed.",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
     }
 
 }

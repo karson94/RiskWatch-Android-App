@@ -68,15 +68,19 @@ public class HomeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_home);
 
         Intent intent = getIntent();
-
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
 
         if (intent != null) {
             String username = intent.getStringExtra("user");
+            boolean isGuest = intent.getBooleanExtra("isGuest", false);
             currentUser = new User(username);
             Log.d(TAG, "HOME USERNAME " + currentUser.getUserName());
-            assert fireUser != null;
-            Log.d(TAG, "FireAuth UID: " + fireUser.getUid());
+            
+            if (!isGuest) {
+                // Only assert fireUser for non-guest users
+                assert fireUser != null;
+                Log.d(TAG, "FireAuth UID: " + fireUser.getUid());
+            }
         }
 
         initRead();
