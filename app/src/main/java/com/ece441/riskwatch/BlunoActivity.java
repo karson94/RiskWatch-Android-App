@@ -10,12 +10,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ArrayAdapter;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
-import android.content.Context;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public class BlunoActivity extends BlunoLibrary {
     private Button buttonScan;
@@ -25,35 +21,34 @@ public class BlunoActivity extends BlunoLibrary {
     private TextView serialReceivedText;
     private ListView listViewDevices;
     private ArrayAdapter<String> listAdapter;
+    private boolean mScanning = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bluno);
 
-        request(1000, new OnPermissionsResult() {
-            @Override
-            public void OnSuccess() {
-                Toast.makeText(BlunoActivity.this, R.string.permissions_granted, Toast.LENGTH_SHORT).show();
-            }
+        // Initialize UI components
+        serialReceivedText = findViewById(R.id.serialReceivedText);
+        serialSendText = findViewById(R.id.serialSendText);
+        buttonSerialSend = findViewById(R.id.buttonSerialSend);
+        listViewDevices = findViewById(R.id.listViewDevices);
+        buttonScan = findViewById(R.id.buttonScan);
+        buttonReset = findViewById(R.id.buttonReset);
 
-            @Override
-            public void OnFail(List<String> noPermissions) {
-                Toast.makeText(BlunoActivity.this, R.string.permissions_denied, Toast.LENGTH_SHORT).show();
+        // Setup ListView and Adapter
+        listAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        listViewDevices.setAdapter(listAdapter);
+
+        // Setup click listeners
+        buttonSerialSend.setOnClickListener(v -> {
+            String message = serialSendText.getText().toString();
+            if (!message.isEmpty()) {
+                serialSend(message);
+                serialSendText.setText("");
             }
         });
 
-        serialBegin(115200);
-
-        serialReceivedText = findViewById(R.id.serialReceivedText);
-        serialSendText = findViewById(R.id.serialSendText);
-
-        buttonSerialSend = findViewById(R.id.buttonSerialSend);
-        buttonSerialSend.setOnClickListener(v -> serialSend(serialSendText.getText().toString()));
-
-        listViewDevices = findViewById(R.id.listViewDevices);
-        listAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
-        listViewDevices.setAdapter(listAdapter);
         listViewDevices.setOnItemClickListener((parent, view, position, id) -> {
             String deviceInfo = (String) parent.getItemAtPosition(position);
             String[] parts = deviceInfo.split("\n");
@@ -63,54 +58,37 @@ public class BlunoActivity extends BlunoLibrary {
             }
         });
 
-        buttonScan = findViewById(R.id.buttonScan);
         buttonScan.setOnClickListener(v -> {
-            if (isScanning()) {
+            if (mScanning) {
                 scanLeDevice(false);
+                mScanning = false;
+                buttonScan.setText(R.string.scan);
             } else {
                 listAdapter.clear();
                 scanLeDevice(true);
+                mScanning = true;
+                buttonScan.setText(R.string.scanning);
             }
         });
 
-        buttonReset = findViewById(R.id.buttonReset);
         buttonReset.setOnClickListener(v -> resetBluetooth());
     }
 
     private void resetBluetooth() {
-        // Stop scanning if scanning
-        if (isScanning()) {
+        if (mScanning) {
             scanLeDevice(false);
+            mScanning = false;
         }
 
-        // Disconnect if connected
         if (mConnectionState == connectionStateEnum.isConnected) {
-            serialSend("AT+DISC");  // Send disconnect command to Bluno
-            mBluetoothLeService.disconnect();
+            disconnect();
         }
 
-        // Clear the device list
         listAdapter.clear();
-        listAdapter.notifyDataSetChanged();
-
-        // Clear the received text
         serialReceivedText.setText("");
-
-        // Reset the scan button text
         buttonScan.setText(R.string.scan);
-
-        // Reset the connection state
         mConnectionState = connectionStateEnum.isToScan;
-
-        // Optionally, you can add any other reset logic here
-
         Toast.makeText(this, "Bluetooth reset", Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        System.out.println("BlunoActivity onResume");
     }
 
     @Override
@@ -141,7 +119,7 @@ public class BlunoActivity extends BlunoLibrary {
     @Override
     public void onSerialReceived(String theString) {
         runOnUiThread(() -> {
-            serialReceivedText.append(theString);
+            serialReceivedText.append(theString + "\n");
             ((ScrollView) serialReceivedText.getParent()).fullScroll(View.FOCUS_DOWN);
         });
     }
@@ -149,17 +127,11 @@ public class BlunoActivity extends BlunoLibrary {
     @Override
     public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
         runOnUiThread(() -> {
-            if (checkBluetoothPermissions()) {
-                String deviceInfo = device.getName() + "\n" + device.getAddress();
-                if (listAdapter.getPosition(deviceInfo) == -1) {
-                    listAdapter.add(deviceInfo);
-                    listAdapter.notifyDataSetChanged();
-                }
+            String deviceInfo = device.getName() + "\n" + device.getAddress();
+            if (listAdapter.getPosition(deviceInfo) == -1) {
+                listAdapter.add(deviceInfo);
+                listAdapter.notifyDataSetChanged();
             }
         });
-    }
-
-    private boolean isScanning() {
-        return mScanning;
     }
 }
