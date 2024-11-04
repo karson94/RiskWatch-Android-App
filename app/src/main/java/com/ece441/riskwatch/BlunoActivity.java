@@ -10,6 +10,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ArrayAdapter;
+import android.util.Log;
 
 import java.util.ArrayList;
 
@@ -51,11 +52,7 @@ public class BlunoActivity extends BlunoLibrary {
 
         listViewDevices.setOnItemClickListener((parent, view, position, id) -> {
             String deviceInfo = (String) parent.getItemAtPosition(position);
-            String[] parts = deviceInfo.split("\n");
-            if (parts.length > 1) {
-                String deviceAddress = parts[1];
-                connect(deviceAddress);
-            }
+            connectToDevice(deviceInfo);
         });
 
         buttonScan.setOnClickListener(v -> {
@@ -119,6 +116,7 @@ public class BlunoActivity extends BlunoLibrary {
     @Override
     public void onSerialReceived(String theString) {
         runOnUiThread(() -> {
+            Log.d("BlunoActivity", "Received data: " + theString);
             serialReceivedText.append(theString + "\n");
             ((ScrollView) serialReceivedText.getParent()).fullScroll(View.FOCUS_DOWN);
         });
@@ -127,11 +125,37 @@ public class BlunoActivity extends BlunoLibrary {
     @Override
     public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
         runOnUiThread(() -> {
-            String deviceInfo = device.getName() + "\n" + device.getAddress();
+            // Skip if device is null
+            if (device == null) return;
+            
+            String deviceName = device.getName();
+            String deviceAddress = device.getAddress();
+            
+            // Skip if address is null or device name is null/empty
+            if (deviceAddress == null || deviceName == null || deviceName.isEmpty()) return;
+            
+            // Skip if device name is "Unknown Device"
+            if (deviceName.equals("Unknown Device")) return;
+            
+            // Format device info, showing actual name
+            String deviceInfo = String.format("%s\n%s\nRSSI: %d dBm", 
+                deviceName, deviceAddress, rssi);
+            
+            // Check if device is already in the list
             if (listAdapter.getPosition(deviceInfo) == -1) {
+                Log.d("BlunoActivity", "Adding device to list: " + deviceInfo);
                 listAdapter.add(deviceInfo);
                 listAdapter.notifyDataSetChanged();
             }
         });
+    }
+
+    // Update the connect method to handle the formatted device info string
+    private void connectToDevice(String deviceInfo) {
+        String[] parts = deviceInfo.split("\n");
+        if (parts.length >= 2) {
+            String deviceAddress = parts[1];  // Get the address from the second line
+            connect(deviceAddress);
+        }
     }
 }
