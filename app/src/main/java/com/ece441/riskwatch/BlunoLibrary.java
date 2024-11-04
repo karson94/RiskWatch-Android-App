@@ -119,6 +119,8 @@ public abstract class BlunoLibrary extends Activity {
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
                 Log.d(TAG, "ACTION_GATT_CONNECTED");
                 mConnected = true;
+                mConnectionState = connectionStateEnum.isConnected;
+                onConectionStateChange(mConnectionState);
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 Log.d(TAG, "ACTION_GATT_SERVICES_DISCOVERED");
                 List<BluetoothGattService> gattServices = mBluetoothLeService.getSupportedGattServices();
@@ -129,8 +131,6 @@ public abstract class BlunoLibrary extends Activity {
                             if (gattCharacteristic.getUuid().equals(CHARACTERISTIC_UUID)) {
                                 mDataCharacteristic = gattCharacteristic;
                                 mBluetoothLeService.setCharacteristicNotification(mDataCharacteristic, true);
-                                mConnectionState = connectionStateEnum.isConnected;
-                                onConectionStateChange(mConnectionState);
                                 return;
                             }
                         }
@@ -145,7 +145,9 @@ public abstract class BlunoLibrary extends Activity {
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
                 Log.d(TAG, "ACTION_DATA_AVAILABLE");
                 String data = intent.getStringExtra(BluetoothLeService.EXTRA_DATA);
-                onSerialReceived(data);
+                if (data != null) {
+                    onSerialReceived(data);
+                }
             }
         }
     };
@@ -180,6 +182,8 @@ public abstract class BlunoLibrary extends Activity {
 
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
         return intentFilter;
@@ -187,38 +191,56 @@ public abstract class BlunoLibrary extends Activity {
 
     public void scanLeDevice(final boolean enable) {
         if (enable) {
+            // Clear previous devices when starting a new scan
+            mBleDevices.clear();
+            
             // Stops scanning after a pre-defined scan period.
-            mHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    if (mConnectionState == connectionStateEnum.isScanning) {
-                        mConnectionState = connectionStateEnum.isToScan;
-                        onConectionStateChange(mConnectionState);
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            if (ActivityCompat.checkSelfPermission(BlunoLibrary.this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                                return;
-                            }
+            mHandler.postDelayed(() -> {
+                if (mConnectionState == connectionStateEnum.isScanning) {
+                    mConnectionState = connectionStateEnum.isToScan;
+                    onConectionStateChange(mConnectionState);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (ActivityCompat.checkSelfPermission(BlunoLibrary.this, 
+                            Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                            return;
                         }
-                        mBluetoothLeScanner.stopScan(mLeScanCallback);
                     }
+                    mBluetoothLeScanner.stopScan(mLeScanCallback);
                 }
             }, SCAN_PERIOD);
 
+            // Update scan settings for better device discovery
+            mScanSettings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build();
+
+            // Initially scan without filters to debug
+            mScanFilters = new ArrayList<>();
+            // Uncomment this after confirming devices are being found
+            // ScanFilter riskWatchFilter = new ScanFilter.Builder()
+            //     .setDeviceName("RiskWatch")
+            //     .build();
+            // mScanFilters.add(riskWatchFilter);
 
             mConnectionState = connectionStateEnum.isScanning;
             onConectionStateChange(mConnectionState);
-            mBleDevices.clear();
+            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                if (ActivityCompat.checkSelfPermission(this, 
+                    Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
                     return;
                 }
             }
-            mBluetoothLeScanner.startScan(mScanFilters, mScanSettings, mLeScanCallback);
+
+            // Add logging to debug scan start
+            Log.d(TAG, "Starting BLE scan...");
+            mBluetoothLeScanner.startScan(null, mScanSettings, mLeScanCallback);
         } else {
             mConnectionState = connectionStateEnum.isToScan;
             onConectionStateChange(mConnectionState);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                if (ActivityCompat.checkSelfPermission(this, 
+                    Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
                     return;
                 }
             }
@@ -226,16 +248,23 @@ public abstract class BlunoLibrary extends Activity {
         }
     }
 
-
     private ScanCallback mLeScanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
             super.onScanResult(callbackType, result);
             BluetoothDevice device = result.getDevice();
+            
+            // Only add device if it's not already in the list
             if (device != null && !mBleDevices.contains(device)) {
                 mBleDevices.add(device);
                 onLeScan(device, result.getRssi(), result.getScanRecord().getBytes());
             }
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            Log.e(TAG, "Scan Failed. Error code: " + errorCode);
+            super.onScanFailed(errorCode);
         }
     };
 
@@ -244,7 +273,6 @@ public abstract class BlunoLibrary extends Activity {
     public abstract void onConectionStateChange(connectionStateEnum theConnectionState); //Explicitly declare abstract method
 
     public abstract void onSerialReceived(String theString);
-
 
     public void connect(final String address) {
         if (mBluetoothAdapter == null || address == null) {
@@ -274,8 +302,11 @@ public abstract class BlunoLibrary extends Activity {
 
     public void serialSend(String theString) {
         if (mDataCharacteristic != null && mBluetoothLeService != null) {
+            Log.d(TAG, "Sending data: " + theString);
             mDataCharacteristic.setValue(theString.getBytes());
             mBluetoothLeService.writeCharacteristic(mDataCharacteristic);
+        } else {
+            Log.e(TAG, "Cannot send data - characteristic or service is null");
         }
     }
 

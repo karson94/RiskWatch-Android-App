@@ -44,7 +44,7 @@ public class BluetoothLeService extends Service {
                 mConnectionState = STATE_CONNECTED;
                 broadcastUpdate(intentAction);
                 Log.i(TAG, "Connected to GATT server.");
-                Log.i(TAG, "Attempting to start service discovery:" + mBluetoothGatt.discoverServices());
+                gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
                 mConnectionState = STATE_DISCONNECTED;
