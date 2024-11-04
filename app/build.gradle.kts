@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.ece441.riskwatch"
-        minSdk = 33
+        minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
