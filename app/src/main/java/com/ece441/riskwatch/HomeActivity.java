@@ -142,7 +142,7 @@ public class HomeActivity extends AppCompatActivity {
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_bluetooth) {
-                openBlunoActivity(null);
+                openBluetoothActivity(null);
                 return true;
             } else if (itemId == R.id.navigation_settings) {
                 showSettingsDialog();
@@ -436,8 +436,8 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     // Bluetooth
-    public void openBlunoActivity(View view) {
-        Intent intent = new Intent(this, ChipActivity.class);
+    public void openBluetoothActivity(View view) {
+        Intent intent = new Intent(this, BluetoothActivity.class);
         startActivity(intent);
     }
 
