@@ -208,6 +208,9 @@ public class BluetoothActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 if (newState == BluetoothAdapter.STATE_CONNECTED) {
                     Log.d(TAG, "Connected to GATT server.");
+                    // Request MTU size of 512 bytes
+                    boolean mtuResult = gatt.requestMtu(512);
+                    Log.d(TAG, "MTU request initiated: " + mtuResult);
                     // Notify user
                     Toast.makeText(BluetoothActivity.this, "Connected to " + gatt.getDevice().getName(), Toast.LENGTH_SHORT).show();
                     gatt.discoverServices();
@@ -316,14 +319,6 @@ public class BluetoothActivity extends AppCompatActivity {
                             // Log the parsed data
                             Log.d(TAG, String.format("Parsed Data - Time: %s, Date: %s, HR: %d, ΔHR: %d, Impact: %.1f, Direction: %s",
                                     time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
-
-                            String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-                            
-                            runOnUiThread(() -> {
-                                ((HomeActivity) getApplicationContext()).addFallEntry(
-                                    userId, time, date, deltaHeartRate, heartRate, fallDirection, impactSeverity);
-                                appendLog("Fall detected and logged to database");
-                            });
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error parsing data: " + e.getMessage());
@@ -347,6 +342,12 @@ public class BluetoothActivity extends AppCompatActivity {
                     appendLog("Failed to send data");
                 }
             });
+        }
+
+        @Override
+        public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+            super.onMtuChanged(gatt, mtu, status);
+            Log.d(TAG, "MTU changed to: " + mtu + " Status: " + status);
         }
     };
 
