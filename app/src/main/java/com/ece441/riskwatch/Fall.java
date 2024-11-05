@@ -11,8 +11,11 @@ public class Fall implements Serializable {
     public int deltaHeartRate;
     public double impactSeverity;
     public String fallDirection;
+    public double latitude;
+    public double longitude;
+    public String address;
 
-    public Fall(String fallID, String time, String date, int heartRate, int deltaHeartRate, double impactSeverity, String fallDirection){
+    public Fall(String fallID, String time, String date, int heartRate, int deltaHeartRate, double impactSeverity, String fallDirection, double latitude, double longitude, String address) {
         this.time = time;
         this.date = date;
         this.heartRate = heartRate;
@@ -20,6 +23,9 @@ public class Fall implements Serializable {
         this.impactSeverity = impactSeverity;
         this.fallDirection = fallDirection;
         this.fallID = fallID;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.address = address;
     }
 
     public String getfallID() {
@@ -46,5 +52,17 @@ public class Fall implements Serializable {
     }
     public double getImpactSeverity() {
         return impactSeverity;
+    }
+
+    public double getLatitude() {
+        return latitude;
+    }
+
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public String getAddress() {
+        return address;
     }
 }
