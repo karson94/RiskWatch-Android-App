@@ -39,57 +39,66 @@
         android:divider="@android:color/darker_gray"
         android:dividerHeight="1dp"
         app:layout_constraintTop_toBottomOf="@id/btn_scan"
-        app:layout_constraintBottom_toTopOf="@id/edit_data"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp" />
+        android:layout_margin="16dp"/>
 
-    <EditText
-        android:id="@+id/edit_data"
+    <LinearLayout
+        android:id="@+id/connected_layout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:hint="Enter data to send"
-        android:textColorHint="#80FFFFFF"
-        android:textColor="#FFFFFF"
-        android:padding="8dp"
-        app:layout_constraintBottom_toTopOf="@id/btn_send"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp"/>
-
-    <Button
-        android:id="@+id/btn_send"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Send Data"
-        app:layout_constraintBottom_toTopOf="@id/log_scroll_view"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginBottom="8dp"/>
-
-    <ScrollView
-        android:id="@+id/log_scroll_view"
-        android:layout_width="0dp"
-        android:layout_height="150dp"
-        android:background="#1A2634"
-        android:padding="8dp"
+        android:orientation="vertical"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_margin="16dp">
 
-        <TextView
-            android:id="@+id/log_text_view"
+        <EditText
+            android:id="@+id/edit_data"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:hint="Enter data to send"
+            android:textColorHint="#80FFFFFF"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"/>
-    </ScrollView>
+            android:padding="8dp"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btn_send"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Send Data"
+            android:layout_gravity="center"
+            android:layout_marginBottom="8dp"/>
+
+        <ScrollView
+            android:id="@+id/log_scroll_view"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:background="#1A2634"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/log_text_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"/>
+        </ScrollView>
+    </LinearLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#377FC2"
+        app:itemIconTint="@color/white"
+        app:itemTextColor="@color/white"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:menu="@menu/bottom_nav_menu" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

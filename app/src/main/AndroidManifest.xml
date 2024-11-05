@@ -55,6 +55,10 @@
             android:name=".BluetoothActivity"
             android:exported="false"
             android:label="Bluetooth Activity" />
+        <activity
+            android:name=".FallAnalysisActivity"
+            android:exported="false"
+            android:label="Fall Analysis" />
 
         <meta-data
             android:name="preloaded_fonts"
