@@ -3,45 +3,24 @@ package com.ece441.riskwatch;
 import static android.content.ContentValues.TAG;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import java.util.Set;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 // Firebase imports
 import com.google.firebase.database.*;
-import com.google.firebase.ktx.Firebase;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -50,14 +29,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import java.util.Random;
-
 import android.location.Location;
 import android.location.LocationManager;
 import android.location.Geocoder;
 import android.location.Address;
 import java.util.List;
 import java.util.Locale;
+
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class HomeActivity extends AppCompatActivity {
 
@@ -157,6 +137,34 @@ public class HomeActivity extends AppCompatActivity {
 
         // Start thread
         thread.start();
+
+        BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.navigation_bluetooth) {
+                openBlunoActivity(null);
+                return true;
+            } else if (itemId == R.id.navigation_settings) {
+                showSettingsDialog();
+                return true;
+            } else if (itemId == R.id.navigation_home) {
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void showSettingsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Settings")
+               .setItems(new CharSequence[]{"Account Linking", "Logout"}, (dialog, which) -> {
+                   if (which == 0) {
+                       accountLink(null);
+                   } else if (which == 1) {
+                       logOut(null);
+                   }
+               })
+               .show();
     }
 
     // Android "Toast" notif. Only appears in app
@@ -429,7 +437,7 @@ public class HomeActivity extends AppCompatActivity {
 
     // Bluetooth
     public void openBlunoActivity(View view) {
-        Intent intent = new Intent(this, BlunoActivity.class);
+        Intent intent = new Intent(this, ChipActivity.class);
         startActivity(intent);
     }
 
