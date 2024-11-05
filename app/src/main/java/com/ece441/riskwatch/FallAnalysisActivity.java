@@ -1,18 +1,18 @@
 package com.ece441.riskwatch;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.*;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import java.util.*;
 
 public class FallAnalysisActivity extends AppCompatActivity {
     private TextView avgSeverityText, commonDirectionText, avgHeartRateText, commonTimeText;
     private RecyclerView recyclerView;
-    private List<Fall> fallList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,9 +25,7 @@ public class FallAnalysisActivity extends AppCompatActivity {
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_bluetooth) {
-                if (!(this instanceof BluetoothActivity)) {
-                    startActivity(new Intent(this, BluetoothActivity.class));
-                }
+                startActivity(new Intent(this, BluetoothActivity.class));
                 return true;
             } else if (itemId == R.id.navigation_settings) {
                 showSettingsDialog();
@@ -36,16 +34,13 @@ public class FallAnalysisActivity extends AppCompatActivity {
                 startActivity(new Intent(this, HomeActivity.class));
                 return true;
             } else if (itemId == R.id.navigation_analysis) {
-                if (!(this instanceof FallAnalysisActivity)) {
-                    startActivity(new Intent(this, FallAnalysisActivity.class));
-                }
                 return true;
             }
             return false;
         });
 
         initializeViews();
-        loadFallData();
+        analyzeFallData();
     }
 
     private void initializeViews() {
@@ -57,47 +52,24 @@ public class FallAnalysisActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
     }
 
-    private void loadFallData() {
-        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference fallsRef = FirebaseDatabase.getInstance()
-            .getReference("users")
-            .child(userId)
-            .child("falls");
+    private void analyzeFallData() {
+        ArrayList<Fall> fallList = HomeActivity.getFallArrayList();
+        Map<String, Integer> directionCount = new HashMap<>();
+        Map<String, Integer> timeCount = new HashMap<>();
+        double totalSeverity = 0;
+        double totalHeartRateChange = 0;
+        int count = fallList.size();
 
-        fallsRef.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                fallList.clear();
-                Map<String, Integer> directionCount = new HashMap<>();
-                Map<String, Integer> timeCount = new HashMap<>();
-                double totalSeverity = 0;
-                double totalHeartRateChange = 0;
-                int count = 0;
+        for (Fall fall : fallList) {
+            directionCount.put(fall.getFallDirection(), 
+                directionCount.getOrDefault(fall.getFallDirection(), 0) + 1);
+            timeCount.put(fall.getTime(), 
+                timeCount.getOrDefault(fall.getTime(), 0) + 1);
+            totalSeverity += fall.getImpactSeverity();
+            totalHeartRateChange += fall.getDeltaHeartRate();
+        }
 
-                for (DataSnapshot fallSnapshot : dataSnapshot.getChildren()) {
-                    Fall fall = fallSnapshot.getValue(Fall.class);
-                    if (fall != null) {
-                        fallList.add(fall);
-                        
-                        // Update statistics
-                        directionCount.put(fall.getFallDirection(), 
-                            directionCount.getOrDefault(fall.getFallDirection(), 0) + 1);
-                        timeCount.put(fall.getTime(), 
-                            timeCount.getOrDefault(fall.getTime(), 0) + 1);
-                        totalSeverity += fall.getImpactSeverity();
-                        totalHeartRateChange += fall.getDeltaHeartRate();
-                        count++;
-                    }
-                }
-
-                updateAnalysis(directionCount, timeCount, totalSeverity, totalHeartRateChange, count);
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                // Handle error
-            }
-        });
+        updateAnalysis(directionCount, timeCount, totalSeverity, totalHeartRateChange, count);
     }
 
     private void updateAnalysis(Map<String, Integer> directionCount, 
@@ -106,21 +78,17 @@ public class FallAnalysisActivity extends AppCompatActivity {
                               double totalHeartRateChange, 
                               int count) {
         if (count > 0) {
-            // Update average severity
             double avgSeverity = totalSeverity / count;
             avgSeverityText.setText(String.format("Average Severity: %.2f", avgSeverity));
 
-            // Update most common direction
             String commonDirection = Collections.max(directionCount.entrySet(), 
                 Map.Entry.comparingByValue()).getKey();
             commonDirectionText.setText("Most Common Direction: " + commonDirection);
 
-            // Update average heart rate change
             double avgHeartRateChange = totalHeartRateChange / count;
             avgHeartRateText.setText(String.format("Average Heart Rate Change: %.1f", 
                 avgHeartRateChange));
 
-            // Update most common time
             String commonTime = Collections.max(timeCount.entrySet(), 
                 Map.Entry.comparingByValue()).getKey();
             commonTimeText.setText("Most Common Time: " + commonTime);

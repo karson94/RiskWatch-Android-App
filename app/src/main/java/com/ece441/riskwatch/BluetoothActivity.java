@@ -28,6 +28,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.util.UUID;
 
@@ -66,14 +68,9 @@ public class BluetoothActivity extends AppCompatActivity {
         setContentView(R.layout.activity_bluetooth);
 
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
-        bottomNav.setSelectedItemId(R.id.navigation_bluetooth);
-        
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_bluetooth) {
-                if (!(this instanceof BluetoothActivity)) {
-                    startActivity(new Intent(this, BluetoothActivity.class));
-                }
                 return true;
             } else if (itemId == R.id.navigation_settings) {
                 showSettingsDialog();
@@ -82,9 +79,7 @@ public class BluetoothActivity extends AppCompatActivity {
                 startActivity(new Intent(this, HomeActivity.class));
                 return true;
             } else if (itemId == R.id.navigation_analysis) {
-                if (!(this instanceof FallAnalysisActivity)) {
-                    startActivity(new Intent(this, FallAnalysisActivity.class));
-                }
+                startActivity(new Intent(this, FallAnalysisActivity.class));
                 return true;
             }
             return false;

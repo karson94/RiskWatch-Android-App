@@ -489,4 +489,8 @@ public class HomeActivity extends AppCompatActivity {
             }
         }
     }
+
+    public static ArrayList<Fall> getFallArrayList() {
+        return fallArrayList;
+    }
 }
