@@ -65,6 +65,31 @@ public class BluetoothActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bluetooth);
 
+        BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        bottomNav.setSelectedItemId(R.id.navigation_bluetooth);
+        
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.navigation_bluetooth) {
+                if (!(this instanceof BluetoothActivity)) {
+                    startActivity(new Intent(this, BluetoothActivity.class));
+                }
+                return true;
+            } else if (itemId == R.id.navigation_settings) {
+                showSettingsDialog();
+                return true;
+            } else if (itemId == R.id.navigation_home) {
+                startActivity(new Intent(this, HomeActivity.class));
+                return true;
+            } else if (itemId == R.id.navigation_analysis) {
+                if (!(this instanceof FallAnalysisActivity)) {
+                    startActivity(new Intent(this, FallAnalysisActivity.class));
+                }
+                return true;
+            }
+            return false;
+        });
+
         ListView listView = findViewById(R.id.device_list);
         deviceListAdapter = new DeviceListAdapter(this);
         listView.setAdapter(deviceListAdapter);
@@ -390,5 +415,18 @@ public class BluetoothActivity extends AppCompatActivity {
         logTextView.setText(currentLog);
         // Scroll to the bottom
         logScrollView.post(() -> logScrollView.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private void showSettingsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Settings")
+               .setItems(new CharSequence[]{"Account Linking", "Logout"}, (dialog, which) -> {
+                   if (which == 0) {
+                       startActivity(new Intent(this, AccountLink.class));
+                   } else if (which == 1) {
+                       startActivity(new Intent(this, LoginScreen.class));
+                   }
+               })
+               .show();
     }
 }
