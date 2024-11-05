@@ -124,5 +124,15 @@
         app:layout_constraintTop_toBottomOf="@+id/linkButton"
         tools:ignore="SmallSp,HardcodedText" />
 
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_fall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="16dp"
+        android:onClick="addRandFall"
+        android:contentDescription="Add random fall"
+        android:src="@drawable/ic_add"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

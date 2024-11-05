@@ -52,6 +52,13 @@ import java.util.Map;
 
 import java.util.Random;
 
+import android.location.Location;
+import android.location.LocationManager;
+import android.location.Geocoder;
+import android.location.Address;
+import java.util.List;
+import java.util.Locale;
+
 public class HomeActivity extends AppCompatActivity {
 
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
@@ -62,10 +69,23 @@ public class HomeActivity extends AppCompatActivity {
 
     boolean startup = true;
 
+    private LocationManager locationManager;
+    private Geocoder geocoder;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                },
+                1);
+        }
 
         Intent intent = getIntent();
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
@@ -158,30 +178,114 @@ public class HomeActivity extends AppCompatActivity {
     // Does this via addFallEntry
     public void addRandFall(View view) {
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
-        addFallEntry(fireUser.getUid(), "03:02 AM", "03/20/24", 20, 100, "Left", 0.4);
+        if (fireUser != null) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                    == PackageManager.PERMISSION_GRANTED) {
+                
+                locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                geocoder = new Geocoder(this, Locale.getDefault());
+                
+                try {
+                    Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                    if (lastLocation != null) {
+                        // Generate fallId first
+                        DatabaseReference fallsRef = FirebaseDatabase.getInstance()
+                            .getReference("users")
+                            .child(fireUser.getUid())
+                            .child("falls");
+                        String fallId = fallsRef.push().getKey();
+                        
+                        if (fallId != null) {
+                            double latitude = lastLocation.getLatitude();
+                            double longitude = lastLocation.getLongitude();
+                            String address = "Unknown location";
+                            
+                            try {
+                                List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                                if (!addresses.isEmpty()) {
+                                    Address addr = addresses.get(0);
+                                    address = addr.getAddressLine(0);
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error getting address: " + e.getMessage());
+                            }
+                            
+                            // Create a Map to hold all fall data
+                            Map<String, Object> fallData = new HashMap<>();
+                            fallData.put("time", "03:02 AM");
+                            fallData.put("date", "03/20/24");
+                            fallData.put("deltaHeartRate", 20);
+                            fallData.put("heartRate", 100);
+                            fallData.put("fallDirection", "Left");
+                            fallData.put("impactSeverity", 0.4);
+                            fallData.put("latitude", latitude);
+                            fallData.put("longitude", longitude);
+                            fallData.put("address", address);
+                            
+                            // Write all data at once
+                            fallsRef.child(fallId).setValue(fallData);
+                        }
+                    } else {
+                        Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (SecurityException e) {
+                    Log.e(TAG, "Error accessing location: " + e.getMessage());
+                    Toast.makeText(this, "Location access error", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     // Gets passed fall metrics, creates new fall in database for current user
     public void addFallEntry(String userId, String time, String date,
                              int deltaHeartRate, int heartRate, String fallDirection, double impactSeverity) {
-        // Get a reference to the "users" directory in the Firebase Realtime Database
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference usersRef = database.getReference("users");
-
-        // Get a reference to the "falls" directory under the specific user
         DatabaseReference fallsRef = usersRef.child(userId).child("falls");
 
-        // Generate a unique key for the new fall entry
         String fallId = fallsRef.push().getKey();
         assert fallId != null;
 
-        // Write the fall data to the database under the generated fall ID
-        fallsRef.child(fallId).child("time").setValue(time);
-        fallsRef.child(fallId).child("date").setValue(date);
-        fallsRef.child(fallId).child("deltaHeartRate").setValue(deltaHeartRate);
-        fallsRef.child(fallId).child("heartRate").setValue(heartRate);
-        fallsRef.child(fallId).child("fallDirection").setValue(fallDirection);
-        fallsRef.child(fallId).child("impactSeverity").setValue(impactSeverity);
+        // Get location data first
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                == PackageManager.PERMISSION_GRANTED) {
+            
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            geocoder = new Geocoder(this, Locale.getDefault());
+            
+            Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (lastLocation != null) {
+                double latitude = lastLocation.getLatitude();
+                double longitude = lastLocation.getLongitude();
+                String address = "Unknown location";
+                
+                try {
+                    List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                    if (!addresses.isEmpty()) {
+                        Address addr = addresses.get(0);
+                        address = addr.getAddressLine(0);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error getting address: " + e.getMessage());
+                }
+
+                // Write all fall data including location to Firebase
+                Map<String, Object> fallData = new HashMap<>();
+                fallData.put("time", time);
+                fallData.put("date", date);
+                fallData.put("deltaHeartRate", deltaHeartRate);
+                fallData.put("heartRate", heartRate);
+                fallData.put("fallDirection", fallDirection);
+                fallData.put("impactSeverity", impactSeverity);
+                fallData.put("latitude", latitude);
+                fallData.put("longitude", longitude);
+                fallData.put("address", address);
+
+                fallsRef.child(fallId).setValue(fallData);
+            }
+        }
     }
 
     // Needs to get re-organized. Is the main function that checks if the current user is just a "listener" or if they are the senior
@@ -270,6 +374,10 @@ public class HomeActivity extends AppCompatActivity {
                     double impactSeverity = fallSnapshot.child("impactSeverity").getValue(Double.class);
                     String fallDirection = fallSnapshot.child("fallDirection").getValue(String.class);
 
+                    double latitude = fallSnapshot.child("latitude").getValue(Double.class);
+                    double longitude = fallSnapshot.child("longitude").getValue(Double.class);
+                    String address = fallSnapshot.child("address").getValue(String.class);
+
                     boolean fallExists = false;
                     for (Fall fall : fallArrayList) {
                         if (fall.getfallID().equals(fallID)) {
@@ -279,7 +387,8 @@ public class HomeActivity extends AppCompatActivity {
                     }
 
                     if (!fallExists) {
-                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
+                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, 
+                            impactSeverity, fallDirection, latitude, longitude, address));
                         fallItemAdapter.notifyItemInserted(0);
                         recyclerView.scrollToPosition(0);
 
@@ -322,5 +431,54 @@ public class HomeActivity extends AppCompatActivity {
     public void openBlunoActivity(View view) {
         Intent intent = new Intent(this, BlunoActivity.class);
         startActivity(intent);
+    }
+
+    private void addLocationToFall(String fallId) {
+        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (fireUser != null && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                == PackageManager.PERMISSION_GRANTED) {
+            
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            geocoder = new Geocoder(this, Locale.getDefault());
+            
+            Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (lastLocation != null) {
+                double latitude = lastLocation.getLatitude();
+                double longitude = lastLocation.getLongitude();
+                String address = "Unknown location";
+                
+                try {
+                    List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                    if (!addresses.isEmpty()) {
+                        Address addr = addresses.get(0);
+                        address = addr.getAddressLine(0);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error getting address: " + e.getMessage());
+                }
+
+                // Update Firebase with location data
+                DatabaseReference fallRef = FirebaseDatabase.getInstance()
+                    .getReference("users")
+                    .child(fireUser.getUid())
+                    .child("falls")
+                    .child(fallId);
+                    
+                fallRef.child("latitude").setValue(latitude);
+                fallRef.child("longitude").setValue(longitude);
+                fallRef.child("address").setValue(address);
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted
+                Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 }
