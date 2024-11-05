@@ -1,54 +1,86 @@
 package com.ece441.riskwatch;
 
 import static android.content.ContentValues.TAG;
-
-import androidx.activity.ComponentActivity;
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
-
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-
-import static android.content.ContentValues.TAG;
-
 import android.Manifest;
-import android.bluetooth.*;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.os.Bundle;
-import androidx.activity.ComponentActivity;
-
 import android.content.pm.PackageManager;
-import android.util.Log;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.Toast;
-
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
-
 import com.google.firebase.auth.*;
-
-import java.util.Objects;
 
 public class LoginScreen extends AppCompatActivity {
 
     public User user;
     private FirebaseAuth mAuth;
 
+    // Register for the activity result launchers
+    private final ActivityResultLauncher<String[]> requestPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.POST_NOTIFICATIONS)) {
+                    // Permission granted
+                }
+            });
+
+    private final ActivityResultLauncher<String[]> requestBluetoothPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.BLUETOOTH_CONNECT) &&
+                        isGranted.get(Manifest.permission.BLUETOOTH_SCAN)) {
+                    // Permissions granted
+                }
+            });
+
+    private final ActivityResultLauncher<String[]> requestLocationPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                        isGranted.get(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    // Location permissions granted
+                }
+            });
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login_screen);
         mAuth = FirebaseAuth.getInstance();
+        
+        // Check all required permissions
+        checkNotificationPermission();
+        checkBluetoothPermissions();
+        checkLocationPermissions();
+    }
+
+    // Permission check methods
+    private void checkNotificationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
+        }
+    }
+
+    private void checkLocationPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestLocationPermissionLauncher.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            });
+        }
+    }
+
+    private void checkBluetoothPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            requestBluetoothPermissionLauncher.launch(new String[]{
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN
+            });
+        }
     }
 
     public void login(View view){
