@@ -6,8 +6,28 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:statusBarColor">@color/black</item>
-<!--        <item name="android:fontFamily">@font/share_tech_mono</item>-->
+        <item name="android:statusBarColor">@color/colorPrimaryDark</item>
+        <item name="android:windowBackground">@color/colorPrimaryDark</item>
+        <item name="android:navigationBarColor">@color/colorPrimary</item>
+        
+        <!-- Button styling -->
+        <item name="materialButtonStyle">@style/Widget.RiskWatch.Button</item>
+        
+        <!-- Bottom Navigation styling -->
+        <item name="bottomNavigationStyle">@style/Widget.RiskWatch.BottomNavigationView</item>
+    </style>
+
+    <style name="Widget.RiskWatch.Button" parent="Widget.Material3.Button">
+        <item name="android:backgroundTint">@color/buttonBackground</item>
+        <item name="android:textColor">@color/buttonText</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:fontFamily">@font/share_tech_mono</item>
+    </style>
+
+    <style name="Widget.RiskWatch.BottomNavigationView" parent="Widget.Material3.BottomNavigationView">
+        <item name="android:background">@color/colorPrimary</item>
+        <item name="itemIconTint">@color/white</item>
+        <item name="itemTextColor">@color/white</item>
     </style>
 
     <style name="Theme.RiskWatch" parent="Base.Theme.RiskWatch" />

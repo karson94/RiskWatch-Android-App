@@ -546,7 +546,7 @@ public class HomeActivity extends AppCompatActivity {
             .setAutoCancel(true);
 
         // Add action button to open maps
-        builder.addAction(R.drawable.ic_map, "View Location", mapPendingIntent);
+        builder.addAction(android.R.drawable.ic_dialog_map, "View Location", mapPendingIntent);
 
         // Load map image asynchronously
         new AsyncTask<Void, Void, Bitmap>() {
