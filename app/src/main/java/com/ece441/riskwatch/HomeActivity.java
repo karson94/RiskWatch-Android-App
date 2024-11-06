@@ -38,6 +38,18 @@ import java.util.Locale;
 
 import androidx.appcompat.app.AlertDialog;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.snackbar.Snackbar;
+import android.view.LayoutInflater;
+
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.os.Build;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class HomeActivity extends AppCompatActivity {
 
@@ -161,6 +173,8 @@ public class HomeActivity extends AppCompatActivity {
             }
             return false;
         });
+
+        createNotificationChannel();
     }
 
     private void showSettingsDialog() {
@@ -229,7 +243,8 @@ public class HomeActivity extends AppCompatActivity {
                             
                             // Create a Map to hold all fall data
                             Map<String, Object> fallData = new HashMap<>();
-                            fallData.put("time", "03:02 AM");
+                            String currentTime = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+                            fallData.put("time", currentTime);
                             fallData.put("date", "03/20/24");
                             fallData.put("deltaHeartRate", 20);
                             fallData.put("heartRate", 100);
@@ -241,6 +256,7 @@ public class HomeActivity extends AppCompatActivity {
                             
                             // Write all data at once
                             fallsRef.child(fallId).setValue(fallData);
+                            showFallNotification(currentTime, address, 0.4);
                         }
                     } else {
                         Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
@@ -502,5 +518,41 @@ public class HomeActivity extends AppCompatActivity {
 
     public static ArrayList<Fall> getFallArrayList() {
         return fallArrayList;
+    }
+
+    private void showFallNotification(String time, String location, double severity) {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "fall_detection_channel")
+            .setSmallIcon(R.drawable.ic_warning)
+            .setContentTitle("Fall Detected!")
+            .setContentText("Time: " + time + " | Location: " + location)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true);
+
+        // Create an intent to open the app when notification is clicked
+        Intent intent = new Intent(this, HomeActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
+            PendingIntent.FLAG_IMMUTABLE);
+        builder.setContentIntent(pendingIntent);
+
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) 
+                == PackageManager.PERMISSION_GRANTED) {
+            notificationManager.notify(1, builder.build());
+        }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                "fall_detection_channel",
+                "Fall Detection",
+                NotificationManager.IMPORTANCE_HIGH
+            );
+            channel.setDescription("Notifications for detected falls");
+            
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
     }
 }
