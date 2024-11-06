@@ -68,6 +68,7 @@ public class BluetoothActivity extends AppCompatActivity {
         setContentView(R.layout.activity_bluetooth);
 
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        bottomNav.setSelectedItemId(R.id.navigation_bluetooth);
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_bluetooth) {
@@ -76,10 +77,14 @@ public class BluetoothActivity extends AppCompatActivity {
                 showSettingsDialog();
                 return true;
             } else if (itemId == R.id.navigation_home) {
-                startActivity(new Intent(this, HomeActivity.class));
+                Intent intent = new Intent(this, HomeActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
                 return true;
             } else if (itemId == R.id.navigation_analysis) {
-                startActivity(new Intent(this, FallAnalysisActivity.class));
+                Intent intent = new Intent(this, FallAnalysisActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
                 return true;
             }
             return false;

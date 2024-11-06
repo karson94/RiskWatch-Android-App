@@ -67,12 +67,13 @@ public class HomeActivity extends AppCompatActivity {
                 1);
         }
 
-        Intent intent = getIntent();
+        // Get the intent that started this activity
+        Intent receivedIntent = getIntent();
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
 
-        if (intent != null) {
-            String username = intent.getStringExtra("user");
-            boolean isGuest = intent.getBooleanExtra("isGuest", false);
+        if (receivedIntent != null) {
+            String username = receivedIntent.getStringExtra("user");
+            boolean isGuest = receivedIntent.getBooleanExtra("isGuest", false);
             currentUser = new User(username);
             Log.d(TAG, "HOME USERNAME " + currentUser.getUserName());
             
@@ -139,15 +140,23 @@ public class HomeActivity extends AppCompatActivity {
         thread.start();
 
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        bottomNav.setSelectedItemId(R.id.navigation_home);
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_bluetooth) {
-                openBluetoothActivity(null);
+                Intent intent = new Intent(this, BluetoothActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
                 return true;
             } else if (itemId == R.id.navigation_settings) {
                 showSettingsDialog();
                 return true;
             } else if (itemId == R.id.navigation_home) {
+                return true;
+            } else if (itemId == R.id.navigation_analysis) {
+                Intent intent = new Intent(this, FallAnalysisActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
                 return true;
             }
             return false;
@@ -437,8 +446,9 @@ public class HomeActivity extends AppCompatActivity {
 
     // Bluetooth
     public void openBluetoothActivity(View view) {
-        Intent intent = new Intent(this, BluetoothActivity.class);
-        startActivity(intent);
+        Intent bluetoothIntent = new Intent(this, BluetoothActivity.class);
+        bluetoothIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(bluetoothIntent);
     }
 
     private void addLocationToFall(String fallId) {
