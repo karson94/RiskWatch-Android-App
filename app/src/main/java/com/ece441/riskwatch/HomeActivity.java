@@ -51,6 +51,12 @@ import androidx.core.app.NotificationManagerCompat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import com.bumptech.glide.Glide;
+import android.graphics.Bitmap;
+
+import android.os.AsyncTask;
+import android.net.Uri;
+
 public class HomeActivity extends AppCompatActivity {
 
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
@@ -256,7 +262,7 @@ public class HomeActivity extends AppCompatActivity {
                             
                             // Write all data at once
                             fallsRef.child(fallId).setValue(fallData);
-                            showFallNotification(currentTime, address, 0.4);
+                            showFallNotification(currentTime, address, 0.4, latitude, longitude);
                         }
                     } else {
                         Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
@@ -520,7 +526,18 @@ public class HomeActivity extends AppCompatActivity {
         return fallArrayList;
     }
 
-    private void showFallNotification(String time, String location, double severity) {
+    private void showFallNotification(String time, String location, double severity, double latitude, double longitude) {
+        String staticMapUrl = String.format(
+            "https://maps.googleapis.com/maps/api/staticmap?center=%f,%f&zoom=15&size=600x300&markers=color:red%%7C%f,%f&key=%s",
+            latitude, longitude, latitude, longitude, BuildConfig.MAPS_API_KEY
+        );
+
+        // Create intent to open Google Maps
+        Intent mapIntent = new Intent(Intent.ACTION_VIEW);
+        mapIntent.setData(Uri.parse(String.format("geo:%f,%f?q=%f,%f", latitude, longitude, latitude, longitude)));
+        PendingIntent mapPendingIntent = PendingIntent.getActivity(this, 1, mapIntent, PendingIntent.FLAG_IMMUTABLE);
+
+        // Create the notification builder
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "fall_detection_channel")
             .setSmallIcon(R.drawable.ic_warning)
             .setContentTitle("Fall Detected!")
@@ -528,7 +545,53 @@ public class HomeActivity extends AppCompatActivity {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true);
 
-        // Create an intent to open the app when notification is clicked
+        // Add action button to open maps
+        builder.addAction(R.drawable.ic_map, "View Location", mapPendingIntent);
+
+        // Load map image asynchronously
+        new AsyncTask<Void, Void, Bitmap>() {
+            @Override
+            protected Bitmap doInBackground(Void... voids) {
+                try {
+                    return Glide.with(getApplicationContext())
+                        .asBitmap()
+                        .load(staticMapUrl)
+                        .submit()
+                        .get();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error loading map image: " + e.getMessage());
+                    return null;
+                }
+            }
+
+            @Override
+            protected void onPostExecute(Bitmap bitmap) {
+                if (bitmap != null) {
+                    NotificationCompat.BigPictureStyle bigPictureStyle = new NotificationCompat.BigPictureStyle()
+                        .bigPicture(bitmap)
+                        .setBigContentTitle("Fall Detected!")
+                        .setSummaryText(location);
+                    builder.setStyle(bigPictureStyle);
+                }
+
+                // Show the notification
+                NotificationManagerCompat notificationManager = NotificationManagerCompat.from(HomeActivity.this);
+                if (ActivityCompat.checkSelfPermission(HomeActivity.this, 
+                        android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                    notificationManager.notify(1, builder.build());
+                }
+            }
+        }.execute();
+    }
+
+    private void showBasicNotification(String time, String location, double severity) {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "fall_detection_channel")
+            .setSmallIcon(R.drawable.ic_warning)
+            .setContentTitle("Fall Detected!")
+            .setContentText("Time: " + time + " | Location: " + location)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true);
+
         Intent intent = new Intent(this, HomeActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
