@@ -25,13 +25,17 @@ public class FallAnalysisActivity extends AppCompatActivity {
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_bluetooth) {
-                startActivity(new Intent(this, BluetoothActivity.class));
+                Intent intent = new Intent(this, BluetoothActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
                 return true;
             } else if (itemId == R.id.navigation_settings) {
                 showSettingsDialog();
                 return true;
             } else if (itemId == R.id.navigation_home) {
-                startActivity(new Intent(this, HomeActivity.class));
+                Intent intent = new Intent(this, HomeActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
                 return true;
             } else if (itemId == R.id.navigation_analysis) {
                 return true;
