@@ -75,6 +75,8 @@ public class HomeActivity extends AppCompatActivity {
 
     private static String savedUsername = null;
 
+    private BroadcastReceiver fallDataReceiver;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -193,14 +195,38 @@ public class HomeActivity extends AppCompatActivity {
 
         createNotificationChannel();
 
+        // Initialize the BroadcastReceiver
+        fallDataReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if ("com.ece441.riskwatch.ADD_FALL".equals(intent.getAction())) {
+                    // Extract fall data
+                    String time = intent.getStringExtra("time");
+                    String date = intent.getStringExtra("date");
+                    int heartRate = intent.getIntExtra("heartRate", 0);
+                    int deltaHeartRate = intent.getIntExtra("deltaHeartRate", 0);
+                    double impactSeverity = intent.getDoubleExtra("impactSeverity", 0.0);
+                    String fallDirection = intent.getStringExtra("fallDirection");
+
+                    // Handle the fall data (update UI, store in database, show notification)
+                    handleFallData(time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection);
+                }
+            }
+        };
+
+        // Register the receiver with RECEIVER_NOT_EXPORTED flag
         IntentFilter filter = new IntentFilter("com.ece441.riskwatch.ADD_FALL");
-        registerReceiver(fallReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(fallDataReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(fallDataReceiver, filter);
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(fallReceiver);
+        unregisterReceiver(fallDataReceiver);
     }
 
     private void showSettingsDialog() {
@@ -650,7 +676,7 @@ public class HomeActivity extends AppCompatActivity {
 
     private void showBasicNotification(String time, String location, double severity) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "fall_detection_channel")
-            .setSmallIcon(R.drawable.ic_warning)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert) // Using system alert icon
             .setContentTitle("Fall Detected!")
             .setContentText("Time: " + time + " | Location: " + location)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -683,23 +709,83 @@ public class HomeActivity extends AppCompatActivity {
         }
     }
 
-    private BroadcastReceiver fallReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if ("com.ece441.riskwatch.ADD_FALL".equals(intent.getAction())) {
-                String time = intent.getStringExtra("time");
-                String date = intent.getStringExtra("date");
-                int heartRate = intent.getIntExtra("heartRate", 0);
-                int deltaHeartRate = intent.getIntExtra("deltaHeartRate", 0);
-                double impactSeverity = intent.getDoubleExtra("impactSeverity", 0.0);
-                String fallDirection = intent.getStringExtra("fallDirection");
+    private void handleFallData(String time, String date, int heartRate, 
+                              int deltaHeartRate, double impactSeverity, 
+                              String fallDirection) {
+        // Update UI if activity is visible
+        updateUIWithFallData(time, date, heartRate, deltaHeartRate, 
+                           impactSeverity, fallDirection);
 
-                FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (fireUser != null) {
-                    addFallEntry(fireUser.getUid(), time, date, deltaHeartRate, 
-                        heartRate, fallDirection, impactSeverity);
-                }
+        // Store in Firebase (assuming you have a falls collection)
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            String userId = currentUser.getUid();
+            DatabaseReference fallsRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(userId)
+                .child("falls");
+
+            // Create fall data object
+            Map<String, Object> fallData = new HashMap<>();
+            fallData.put("time", time);
+            fallData.put("date", date);
+            fallData.put("heartRate", heartRate);
+            fallData.put("deltaHeartRate", deltaHeartRate);
+            fallData.put("impactSeverity", impactSeverity);
+            fallData.put("fallDirection", fallDirection);
+            fallData.put("timestamp", ServerValue.TIMESTAMP);
+
+            // Add to Firebase
+            fallsRef.push().setValue(fallData);
+
+            // Show notification
+            showFallNotification(time, impactSeverity, fallDirection);
+        }
+    }
+
+    private void showFallNotification(String time, double impactSeverity, String fallDirection) {
+        NotificationManager notificationManager = 
+            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        // Create notification channel for Android O and above
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel("falls",
+                "Fall Notifications",
+                NotificationManager.IMPORTANCE_HIGH);
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        // Create notification using system icon
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "falls")
+            .setSmallIcon(android.R.drawable.ic_dialog_alert) // Using system alert icon
+            .setContentTitle("Fall Detected!")
+            .setContentText(String.format("Fall detected at %s (Impact: %.1f, Direction: %s)",
+                time, impactSeverity, fallDirection))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true);
+
+        // Show notification
+        if (ActivityCompat.checkSelfPermission(this, 
+                android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            notificationManager.notify(1, builder.build());
+        }
+    }
+
+    private void updateUIWithFallData(String time, String date, int heartRate, 
+                                    int deltaHeartRate, double impactSeverity, 
+                                    String fallDirection) {
+        // Create a new fall object
+        String fallId = FirebaseDatabase.getInstance().getReference().push().getKey();
+        Fall newFall = new Fall(fallId, time, date, heartRate, deltaHeartRate, 
+                               impactSeverity, fallDirection, 0, 0, "Unknown location");
+        
+        // Add to the list and update RecyclerView
+        fallArrayList.add(0, newFall);
+        if (fallItemAdapter != null) {
+            fallItemAdapter.notifyItemInserted(0);
+            if (recyclerView != null) {
+                recyclerView.scrollToPosition(0);
             }
         }
-    };
+    }
 }
