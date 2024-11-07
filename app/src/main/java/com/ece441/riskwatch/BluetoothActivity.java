@@ -424,14 +424,14 @@ public class BluetoothActivity extends AppCompatActivity {
                         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
                         if (fireUser != null) {
                             Intent intent = new Intent(BluetoothActivity.this, HomeActivity.class);
-                            intent.setAction("com.ece441.riskwatch.ADD_FALL");
+                            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
                             intent.putExtra("time", time);
                             intent.putExtra("date", date);
                             intent.putExtra("heartRate", heartRate);
                             intent.putExtra("deltaHeartRate", deltaHeartRate);
                             intent.putExtra("impactSeverity", impactSeverity);
                             intent.putExtra("fallDirection", fallDirection);
-                            sendBroadcast(intent);
+                            startActivity(intent);
                         }
 
                         runOnUiThread(() -> {

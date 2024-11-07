@@ -75,8 +75,6 @@ public class HomeActivity extends AppCompatActivity {
 
     private static String savedUsername = null;
 
-    private BroadcastReceiver fallDataReceiver;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -194,39 +192,11 @@ public class HomeActivity extends AppCompatActivity {
         });
 
         createNotificationChannel();
-
-        // Initialize the BroadcastReceiver
-        fallDataReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if ("com.ece441.riskwatch.ADD_FALL".equals(intent.getAction())) {
-                    // Extract fall data
-                    String time = intent.getStringExtra("time");
-                    String date = intent.getStringExtra("date");
-                    int heartRate = intent.getIntExtra("heartRate", 0);
-                    int deltaHeartRate = intent.getIntExtra("deltaHeartRate", 0);
-                    double impactSeverity = intent.getDoubleExtra("impactSeverity", 0.0);
-                    String fallDirection = intent.getStringExtra("fallDirection");
-
-                    // Handle the fall data (update UI, store in database, show notification)
-                    handleFallData(time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection);
-                }
-            }
-        };
-
-        // Register the receiver with RECEIVER_NOT_EXPORTED flag
-        IntentFilter filter = new IntentFilter("com.ece441.riskwatch.ADD_FALL");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(fallDataReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(fallDataReceiver, filter);
-        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(fallDataReceiver);
     }
 
     private void showSettingsDialog() {
@@ -242,12 +212,6 @@ public class HomeActivity extends AppCompatActivity {
                .show();
     }
 
-    // Android "Toast" notif. Only appears in app
-    public void notifyFallToast(Context context/*, String fallTime String fallData, String fallDirection*/) {
-        String notif = "Fall detected";
-        Toast.makeText(context, notif, Toast.LENGTH_LONG).show();
-    }
-
     // Logs current user out of the application, take user back to login screen
     public void logOut(View view) {
         Intent intent = new Intent(this, LoginScreen.class);
@@ -260,110 +224,58 @@ public class HomeActivity extends AppCompatActivity {
     // Adds sample fall to current user for testing purposes (Let's make this dynamic instead of the static)
     // Does this via addFallEntry
     public void addRandFall(View view) {
-        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (fireUser != null) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
-                    == PackageManager.PERMISSION_GRANTED) {
-                
-                locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-                geocoder = new Geocoder(this, Locale.getDefault());
-                
-                try {
-                    Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                    if (lastLocation != null) {
-                        DatabaseReference fallsRef = FirebaseDatabase.getInstance()
-                            .getReference("users")
-                            .child(fireUser.getUid())
-                            .child("falls");
-                        String fallId = fallsRef.push().getKey();
-                        
-                        if (fallId != null) {
-                            // Base coordinates for random generation
-                            double randBaseLatitude = lastLocation.getLatitude();
-                            double randBaseLongitude = lastLocation.getLongitude();
-                            
-                            // Random offset for simulated falls
-                            double randLatOffset = (Math.random() - 0.5) * 0.01;
-                            double randLonOffset = (Math.random() - 0.5) * 0.01;
-                            
-                            // Final random coordinates
-                            double randLatitude = randBaseLatitude + randLatOffset;
-                            double randLongitude = randBaseLongitude + randLonOffset;
-                            
-                            // Get address for random location
-                            String randAddress = "Unknown location";
-                            try {
-                                List<Address> addresses = geocoder.getFromLocation(randLatitude, randLongitude, 1);
-                                if (!addresses.isEmpty()) {
-                                    randAddress = addresses.get(0).getAddressLine(0);
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error getting address: " + e.getMessage());
-                            }
-
-                            // Generate realistic fall data
-                            // Time: More likely during morning and evening hours
-                            int hour = (int) (Math.random() * 24);
-                            boolean isMorningOrEvening = hour < 10 || hour > 17; // Higher chance of falls
-                            if (!isMorningOrEvening && Math.random() > 0.3) { // 70% chance to regenerate if not morning/evening
-                                hour = Math.random() > 0.5 ? (int)(Math.random() * 10) : (int)(Math.random() * 6) + 18;
-                            }
-                            
-                            String time = String.format("%02d:%02d", hour, (int)(Math.random() * 60));
-                            
-                            // Current date
-                            SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yy", Locale.getDefault());
-                            String date = dateFormat.format(new Date());
-                            
-                            // Heart rate: Base rate 60-80 for elderly
-                            int baseHeartRate = 60 + (int)(Math.random() * 20);
-                            int heartRate = baseHeartRate + (int)(Math.random() * 40); // Increase during fall
-                            int deltaHeartRate = heartRate - baseHeartRate;
-                            
-                            // Impact severity: Usually moderate, occasionally severe
-                            double impactSeverity = Math.random();
-                            if (impactSeverity > 0.8) { // 20% chance of severe fall
-                                impactSeverity = 2.0 + Math.random() * 1.0; // Severe: 2.0-3.0
-                            } else {
-                                impactSeverity = 0.5 + Math.random() * 1.5; // Moderate: 0.5-2.0
-                            }
-                            
-                            // Fall direction: More common to fall forward or sideways
-                            String[] directions = {"Forward", "Backward", "Left", "Right"};
-                            int dirIndex = (int)(Math.random() * 100);
-                            String fallDirection;
-                            if (dirIndex < 40) fallDirection = "Forward";      // 40% forward
-                            else if (dirIndex < 60) fallDirection = "Backward"; // 20% backward
-                            else if (dirIndex < 80) fallDirection = "Left";     // 20% left
-                            else fallDirection = "Right";                       // 20% right
-
-                            // Create fall data map with random values
-                            Map<String, Object> fallData = new HashMap<>();
-                            fallData.put("latitude", randLatitude);
-                            fallData.put("longitude", randLongitude);
-                            fallData.put("address", randAddress);
-                            fallData.put("time", time);
-                            fallData.put("date", date);
-                            fallData.put("heartRate", heartRate);
-                            fallData.put("deltaHeartRate", deltaHeartRate);
-                            fallData.put("impactSeverity", impactSeverity);
-                            fallData.put("fallDirection", fallDirection);
-
-                            assert fallId != null;
-                            fallsRef.child(fallId).setValue(fallData);
-                            
-                            // Show notification
-                            showFallNotification(time, randAddress, impactSeverity, randLatitude, randLongitude);
-                        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                == PackageManager.PERMISSION_GRANTED) {
+            
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            geocoder = new Geocoder(this, Locale.getDefault());
+            
+            try {
+                Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                if (lastLocation != null) {
+                    // Get current time
+                    SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                    String time = timeFormat.format(new Date());
+                    
+                    // Current date
+                    SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yy", Locale.getDefault());
+                    String date = dateFormat.format(new Date());
+                    
+                    // Heart rate: Base rate 60-80 for elderly
+                    int baseHeartRate = 60 + (int)(Math.random() * 20);
+                    int heartRate = baseHeartRate + (int)(Math.random() * 40); // Increase during fall
+                    int deltaHeartRate = heartRate - baseHeartRate;
+                    
+                    // Impact severity: Usually moderate, occasionally severe
+                    double impactSeverity = Math.random();
+                    if (impactSeverity > 0.8) { // 20% chance of severe fall
+                        impactSeverity = 2.0 + Math.random() * 1.0; // Severe: 2.0-3.0
                     } else {
-                        Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
+                        impactSeverity = 0.5 + Math.random() * 1.5; // Moderate: 0.5-2.0
                     }
-                } catch (SecurityException e) {
-                    Log.e(TAG, "Error accessing location: " + e.getMessage());
+                    
+                    // Fall direction: More common to fall forward or sideways
+                    String[] directions = {"Forward", "Backward", "Left", "Right"};
+                    int dirIndex = (int)(Math.random() * 100);
+                    String fallDirection;
+                    if (dirIndex < 40) fallDirection = "Forward";      // 40% forward
+                    else if (dirIndex < 60) fallDirection = "Backward"; // 20% backward
+                    else if (dirIndex < 80) fallDirection = "Left";     // 20% left
+                    else fallDirection = "Right";                       // 20% right
+
+                    FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
+                    if (fireUser != null) {
+                        addFallEntry(fireUser.getUid(), time, date, deltaHeartRate, heartRate, 
+                                   fallDirection, impactSeverity);
+                    }
+                } else {
+                    Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
                 }
-            } else {
-                Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+            } catch (SecurityException e) {
+                Log.e(TAG, "Error accessing location: " + e.getMessage());
             }
+        } else {
+            Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -377,44 +289,32 @@ public class HomeActivity extends AppCompatActivity {
         String fallId = fallsRef.push().getKey();
         assert fallId != null;
 
-        // Get location data first
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
-                == PackageManager.PERMISSION_GRANTED) {
-            
-            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-            geocoder = new Geocoder(this, Locale.getDefault());
-            
-            Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (lastLocation != null) {
-                double latitude = lastLocation.getLatitude();
-                double longitude = lastLocation.getLongitude();
-                String address = "Unknown location";
-                
-                try {
-                    List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
-                    if (!addresses.isEmpty()) {
-                        Address addr = addresses.get(0);
-                        address = addr.getAddressLine(0);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error getting address: " + e.getMessage());
-                }
+        // Create initial fall data
+        Map<String, Object> fallData = new HashMap<>();
+        fallData.put("time", time);
+        fallData.put("date", date);
+        fallData.put("heartRate", heartRate);
+        fallData.put("deltaHeartRate", deltaHeartRate);
+        fallData.put("fallDirection", fallDirection);
+        fallData.put("impactSeverity", impactSeverity);
 
-                // Write all fall data including location to Firebase
-                Map<String, Object> fallData = new HashMap<>();
-                fallData.put("time", time);
-                fallData.put("date", date);
-                fallData.put("deltaHeartRate", deltaHeartRate);
-                fallData.put("heartRate", heartRate);
-                fallData.put("fallDirection", fallDirection);
-                fallData.put("impactSeverity", impactSeverity);
-                fallData.put("latitude", latitude);
-                fallData.put("longitude", longitude);
-                fallData.put("address", address);
+        // Save initial data to Firebase
+        fallsRef.child(fallId).setValue(fallData);
 
-                fallsRef.child(fallId).setValue(fallData);
-            }
+        // Add to UI with initial "Unknown location"
+        Fall newFall = new Fall(fallId, time, date, heartRate, deltaHeartRate,
+                               impactSeverity, fallDirection, 0, 0, "Unknown location");
+        fallArrayList.add(0, newFall);
+        if (fallItemAdapter != null) {
+            fallItemAdapter.notifyItemInserted(0);
+            recyclerView.scrollToPosition(0);
         }
+
+        // Add location data using existing method
+        addLocationToFall(fallId);
+
+        // Show initial notification (location will update when available)
+        showFallNotification(time, "Unknown location", impactSeverity, 0, 0);
     }
 
     // Needs to get re-organized. Is the main function that checks if the current user is just a "listener" or if they are the senior
@@ -571,32 +471,75 @@ public class HomeActivity extends AppCompatActivity {
             locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             geocoder = new Geocoder(this, Locale.getDefault());
             
-            Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (lastLocation != null) {
-                double latitude = lastLocation.getLatitude();
-                double longitude = lastLocation.getLongitude();
-                String address = "Unknown location";
-                
-                try {
-                    List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
-                    if (!addresses.isEmpty()) {
-                        Address addr = addresses.get(0);
-                        address = addr.getAddressLine(0);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error getting address: " + e.getMessage());
-                }
+            try {
+                Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                if (lastLocation != null) {
+                    final double latitude = lastLocation.getLatitude();
+                    final double longitude = lastLocation.getLongitude();
+                    final String address = getAddressFromLocation(lastLocation);
 
-                // Update Firebase with location data
-                DatabaseReference fallRef = FirebaseDatabase.getInstance()
-                    .getReference("users")
-                    .child(fireUser.getUid())
-                    .child("falls")
-                    .child(fallId);
-                    
-                fallRef.child("latitude").setValue(latitude);
-                fallRef.child("longitude").setValue(longitude);
-                fallRef.child("address").setValue(address);
+                    // Update Firebase
+                    DatabaseReference fallRef = FirebaseDatabase.getInstance()
+                        .getReference("users")
+                        .child(fireUser.getUid())
+                        .child("falls")
+                        .child(fallId);
+                        
+                    Map<String, Object> locationUpdates = new HashMap<>();
+                    locationUpdates.put("latitude", latitude);
+                    locationUpdates.put("longitude", longitude);
+                    locationUpdates.put("address", address);
+                    fallRef.updateChildren(locationUpdates);
+
+                    // Update UI
+                    updateFallInUI(fallId, latitude, longitude, address);
+
+                    // Show notification with location and impact severity
+                    fallRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            String time = snapshot.child("time").getValue(String.class);
+                            Double severity = snapshot.child("impactSeverity").getValue(Double.class);
+                            showFallNotification(time, address, severity != null ? severity : 0, latitude, longitude);
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Log.e(TAG, "Error getting fall data: " + error.getMessage());
+                        }
+                    });
+                }
+            } catch (SecurityException e) {
+                Log.e(TAG, "Error accessing location: " + e.getMessage());
+            }
+        }
+    }
+
+    private String getAddressFromLocation(Location location) {
+        String address = "Unknown location";
+        try {
+            List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+            if (!addresses.isEmpty()) {
+                Address addr = addresses.get(0);
+                address = addr.getAddressLine(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting address: " + e.getMessage());
+        }
+        return address;
+    }
+
+    private void updateFallInUI(String fallId, double latitude, double longitude, String address) {
+        for (int i = 0; i < fallArrayList.size(); i++) {
+            Fall fall = fallArrayList.get(i);
+            if (fall.getfallID().equals(fallId)) {
+                fall.latitude = latitude;
+                fall.longitude = longitude;
+                fall.address = address;
+                if (fallItemAdapter != null) {
+                    fallItemAdapter.notifyItemChanged(i);
+                }
+                break;
             }
         }
     }
@@ -674,27 +617,6 @@ public class HomeActivity extends AppCompatActivity {
         }.execute();
     }
 
-    private void showBasicNotification(String time, String location, double severity) {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "fall_detection_channel")
-            .setSmallIcon(android.R.drawable.ic_dialog_alert) // Using system alert icon
-            .setContentTitle("Fall Detected!")
-            .setContentText("Time: " + time + " | Location: " + location)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true);
-
-        Intent intent = new Intent(this, HomeActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 
-            PendingIntent.FLAG_IMMUTABLE);
-        builder.setContentIntent(pendingIntent);
-
-        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) 
-                == PackageManager.PERMISSION_GRANTED) {
-            notificationManager.notify(1, builder.build());
-        }
-    }
-
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -709,82 +631,22 @@ public class HomeActivity extends AppCompatActivity {
         }
     }
 
-    private void handleFallData(String time, String date, int heartRate, 
-                              int deltaHeartRate, double impactSeverity, 
-                              String fallDirection) {
-        // Update UI if activity is visible
-        updateUIWithFallData(time, date, heartRate, deltaHeartRate, 
-                           impactSeverity, fallDirection);
-
-        // Store in Firebase (assuming you have a falls collection)
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null) {
-            String userId = currentUser.getUid();
-            DatabaseReference fallsRef = FirebaseDatabase.getInstance()
-                .getReference("users")
-                .child(userId)
-                .child("falls");
-
-            // Create fall data object
-            Map<String, Object> fallData = new HashMap<>();
-            fallData.put("time", time);
-            fallData.put("date", date);
-            fallData.put("heartRate", heartRate);
-            fallData.put("deltaHeartRate", deltaHeartRate);
-            fallData.put("impactSeverity", impactSeverity);
-            fallData.put("fallDirection", fallDirection);
-            fallData.put("timestamp", ServerValue.TIMESTAMP);
-
-            // Add to Firebase
-            fallsRef.push().setValue(fallData);
-
-            // Show notification
-            showFallNotification(time, impactSeverity, fallDirection);
-        }
-    }
-
-    private void showFallNotification(String time, double impactSeverity, String fallDirection) {
-        NotificationManager notificationManager = 
-            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-
-        // Create notification channel for Android O and above
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel("falls",
-                "Fall Notifications",
-                NotificationManager.IMPORTANCE_HIGH);
-            notificationManager.createNotificationChannel(channel);
-        }
-
-        // Create notification using system icon
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "falls")
-            .setSmallIcon(android.R.drawable.ic_dialog_alert) // Using system alert icon
-            .setContentTitle("Fall Detected!")
-            .setContentText(String.format("Fall detected at %s (Impact: %.1f, Direction: %s)",
-                time, impactSeverity, fallDirection))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true);
-
-        // Show notification
-        if (ActivityCompat.checkSelfPermission(this, 
-                android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-            notificationManager.notify(1, builder.build());
-        }
-    }
-
-    private void updateUIWithFallData(String time, String date, int heartRate, 
-                                    int deltaHeartRate, double impactSeverity, 
-                                    String fallDirection) {
-        // Create a new fall object
-        String fallId = FirebaseDatabase.getInstance().getReference().push().getKey();
-        Fall newFall = new Fall(fallId, time, date, heartRate, deltaHeartRate, 
-                               impactSeverity, fallDirection, 0, 0, "Unknown location");
-        
-        // Add to the list and update RecyclerView
-        fallArrayList.add(0, newFall);
-        if (fallItemAdapter != null) {
-            fallItemAdapter.notifyItemInserted(0);
-            if (recyclerView != null) {
-                recyclerView.scrollToPosition(0);
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent.hasExtra("time")) {
+            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+            if (currentUser != null) {
+                String time = intent.getStringExtra("time");
+                String date = intent.getStringExtra("date");
+                int heartRate = intent.getIntExtra("heartRate", 0);
+                int deltaHeartRate = intent.getIntExtra("deltaHeartRate", 0);
+                double impactSeverity = intent.getDoubleExtra("impactSeverity", 0.0);
+                String fallDirection = intent.getStringExtra("fallDirection");
+                
+                // Use existing addFallEntry method
+                addFallEntry(currentUser.getUid(), time, date, deltaHeartRate, heartRate, 
+                            fallDirection, impactSeverity);
             }
         }
     }
