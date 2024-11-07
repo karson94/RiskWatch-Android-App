@@ -44,7 +44,7 @@ import java.util.Locale;
 public class BluetoothActivity extends AppCompatActivity {
 
     private static final String TAG = "BluetoothActivity";
-    private static final long SCAN_PERIOD = 5000; // 5 seconds
+    private static final long SCAN_PERIOD = 2000; // 2 seconds
     private static final int REQUEST_ENABLE_BT = 1;
     private static final int REQUEST_FINE_LOCATION = 2;
 
@@ -68,6 +68,10 @@ public class BluetoothActivity extends AppCompatActivity {
     private ScrollView logScrollView;
     private TextView connectedDeviceInfo;
 
+    private static BluetoothGatt persistentGatt;
+    private static BluetoothDevice lastConnectedDevice;
+    private static boolean isConnected = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -80,14 +84,17 @@ public class BluetoothActivity extends AppCompatActivity {
             if (itemId == R.id.navigation_bluetooth) {
                 return true;
             } else if (itemId == R.id.navigation_settings) {
+                handleActivityTransition();
                 showSettingsDialog();
                 return true;
             } else if (itemId == R.id.navigation_home) {
+                handleActivityTransition();
                 Intent intent = new Intent(this, HomeActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 startActivity(intent);
                 return true;
             } else if (itemId == R.id.navigation_analysis) {
+                handleActivityTransition();
                 Intent intent = new Intent(this, FallAnalysisActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 startActivity(intent);
@@ -125,6 +132,17 @@ public class BluetoothActivity extends AppCompatActivity {
             finish();
             return;
         }
+
+        // Add this to restore connection if it exists
+        if (persistentGatt != null && isConnected) {
+            bluetoothGatt = persistentGatt;
+            runOnUiThread(() -> {
+                btnSend.setEnabled(true);
+                connectedDeviceInfo.setText("Connected to: " + bluetoothGatt.getDevice().getName());
+                connectedDeviceInfo.setVisibility(View.VISIBLE);
+                logScrollView.setVisibility(View.VISIBLE);
+            });
+        }
     }
 
     private boolean checkPermissionsAndBluetooth() {
@@ -150,9 +168,49 @@ public class BluetoothActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // Only close GATT if the app is actually being destroyed, not just changing activities
+        if (isFinishing()) {
+            if (bluetoothGatt != null) {
+                bluetoothGatt.close();
+                bluetoothGatt = null;
+                persistentGatt = null;
+                lastConnectedDevice = null;
+                isConnected = false;
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Don't close the connection, just hide the UI and save state
         if (bluetoothGatt != null) {
-            bluetoothGatt.close();
-            bluetoothGatt = null;
+            persistentGatt = bluetoothGatt;  // Save the current GATT
+        }
+        if (connectedDeviceInfo != null) {
+            connectedDeviceInfo.setVisibility(View.GONE);
+        }
+        if (logScrollView != null) {
+            logScrollView.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Restore connection state
+        if (persistentGatt != null && isConnected) {
+            bluetoothGatt = persistentGatt;
+            // Refresh the GATT connection
+            bluetoothGatt.connect();
+            runOnUiThread(() -> {
+                btnSend.setEnabled(true);
+                if (bluetoothGatt.getDevice() != null) {
+                    connectedDeviceInfo.setText("Connected to: " + bluetoothGatt.getDevice().getName());
+                    connectedDeviceInfo.setVisibility(View.VISIBLE);
+                    logScrollView.setVisibility(View.VISIBLE);
+                }
+            });
         }
     }
 
@@ -228,7 +286,9 @@ public class BluetoothActivity extends AppCompatActivity {
     private void connectToDevice(BluetoothDevice device) {
         if (bluetoothGatt == null) {
             progressDialog = ProgressDialog.show(this, "Connecting", "Connecting to " + device.getName() + "...");
-            bluetoothGatt = device.connectGatt(this, false, gattCallback);
+            lastConnectedDevice = device;
+            bluetoothGatt = device.connectGatt(this, true, gattCallback); // Note the 'true' for autoConnect
+            persistentGatt = bluetoothGatt;
         }
     }
 
@@ -236,34 +296,42 @@ public class BluetoothActivity extends AppCompatActivity {
         @Override
         public void onConnectionStateChange(@NonNull BluetoothGatt gatt, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
-            runOnUiThread(() -> {
-                if (newState == BluetoothAdapter.STATE_CONNECTED) {
-                    Log.d(TAG, "Connected to GATT server.");
-                    // Request MTU size of 512 bytes
-                    boolean mtuResult = gatt.requestMtu(512);
-                    Log.d(TAG, "MTU request initiated: " + mtuResult);
-                    // Notify user
-                    Toast.makeText(BluetoothActivity.this, "Connected to " + gatt.getDevice().getName(), Toast.LENGTH_SHORT).show();
-                    gatt.discoverServices();
-                } else if (newState == BluetoothAdapter.STATE_DISCONNECTED) {
-                    Log.d(TAG, "Disconnected from GATT server.");
-                    runOnUiThread(() -> {
-                        Toast.makeText(BluetoothActivity.this, "Disconnected from " + gatt.getDevice().getName(), Toast.LENGTH_SHORT).show();
-                        btnSend.setEnabled(false);
-                        connectedDeviceInfo.setVisibility(View.GONE);
-                        logScrollView.setVisibility(View.GONE);
-                        deviceListAdapter.clear();
-                        if (progressDialog != null && progressDialog.isShowing()) {
-                            progressDialog.dismiss();
-                        }
-                        // Clean up gatt
-                        if (bluetoothGatt != null) {
-                            bluetoothGatt.close();
-                            bluetoothGatt = null;
-                        }
-                    });
+            if (newState == BluetoothAdapter.STATE_CONNECTED) {
+                isConnected = true;
+                persistentGatt = gatt;  // Update persistent reference
+                Log.d(TAG, "Connected to GATT server.");
+                boolean mtuResult = gatt.requestMtu(512);
+                Log.d(TAG, "MTU request initiated: " + mtuResult);
+                gatt.discoverServices();
+                
+                runOnUiThread(() -> {
+                    if (!isFinishing()) {
+                        btnSend.setEnabled(true);
+                        connectedDeviceInfo.setText("Connected to: " + gatt.getDevice().getName());
+                        connectedDeviceInfo.setVisibility(View.VISIBLE);
+                        logScrollView.setVisibility(View.VISIBLE);
+                        Toast.makeText(BluetoothActivity.this, 
+                            "Connected to " + gatt.getDevice().getName(), 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else if (newState == BluetoothAdapter.STATE_DISCONNECTED) {
+                Log.d(TAG, "Disconnected from GATT server.");
+                
+                // Only attempt to reconnect if we have a connection reference
+                if (persistentGatt != null && !isFinishing()) {
+                    Log.d(TAG, "Attempting to reconnect...");
+                    persistentGatt.connect();
+                    return;  // Don't update UI or state until reconnection attempt completes
                 }
-            });
+                
+                isConnected = false;
+                runOnUiThread(() -> {
+                    if (!isFinishing()) {
+                        updateUIForDisconnection(gatt);
+                    }
+                });
+            }
         }
 
         @Override
@@ -448,7 +516,29 @@ public class BluetoothActivity extends AppCompatActivity {
                .show();
     }
 
+    private void updateUIForDisconnection(BluetoothGatt gatt) {
+        Toast.makeText(BluetoothActivity.this, 
+            "Disconnected from " + gatt.getDevice().getName(), 
+            Toast.LENGTH_SHORT).show();
+        btnSend.setEnabled(false);
+        connectedDeviceInfo.setVisibility(View.GONE);
+        logScrollView.setVisibility(View.GONE);
+        deviceListAdapter.clear();
+        if (progressDialog != null && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
+    }
+
     private static class FallData {
         JsonObject fallData;
+    }
+
+    private void handleActivityTransition() {
+        // Save the current state
+        if (bluetoothGatt != null) {
+            persistentGatt = bluetoothGatt;
+            // Don't close the connection
+            bluetoothGatt = null;  // Just clear the reference
+        }
     }
 }

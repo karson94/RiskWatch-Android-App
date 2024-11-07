@@ -25,7 +25,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RiskWatch"
         tools:targetApi="34">
-        <service android:name=".BLeService" android:enabled="true" android:exported="false"/>
         <activity
             android:name=".ChipActivity"
             android:exported="false"
@@ -56,7 +55,8 @@
         <activity
             android:name=".BluetoothActivity"
             android:exported="false"
-            android:label="Bluetooth Activity" />
+            android:label="Bluetooth Activity"
+            android:launchMode="singleTask" />
         <activity
             android:name=".FallAnalysisActivity"
             android:exported="false"
