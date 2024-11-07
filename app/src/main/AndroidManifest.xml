@@ -25,7 +25,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RiskWatch"
         tools:targetApi="34">
-        <service android:name=".BLeService" android:enabled="true"/>
+        <service android:name=".BLeService" android:enabled="true" android:exported="false"/>
         <activity
             android:name=".ChipActivity"
             android:exported="false"

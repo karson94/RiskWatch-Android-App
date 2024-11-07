@@ -34,6 +34,12 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import java.util.UUID;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class BluetoothActivity extends AppCompatActivity {
 
@@ -327,32 +333,44 @@ public class BluetoothActivity extends AppCompatActivity {
                     }
                     final String receivedData = stringBuilder.toString();
                     
-                    // Log the raw received data
-                    Log.d(TAG, "Raw data received from device: " + receivedData);
-                    
                     try {
-                        // Parse the comma-separated data
-                        String[] parts = receivedData.split(",");
-                        if (parts.length == 6) {
-                            String time = parts[0].trim();
-                            String date = parts[1].trim();
-                            int heartRate = Integer.parseInt(parts[2].trim());
-                            int deltaHeartRate = Integer.parseInt(parts[3].trim());
-                            double impactSeverity = Double.parseDouble(parts[4].trim());
-                            String fallDirection = parts[5].trim();
+                        Gson gson = new Gson();
+                        FallData fallData = gson.fromJson(receivedData, FallData.class);
+                        JsonObject fallDetails = fallData.fallData;
 
-                            // Log the parsed data
-                            Log.d(TAG, String.format("Parsed Data - Time: %s, Date: %s, HR: %d, ΔHR: %d, Impact: %.1f, Direction: %s",
-                                    time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
+                        // Get the values from JSON
+                        String time = fallDetails.get("time").getAsString();
+                        String date = fallDetails.get("date").getAsString();
+                        int heartRate = fallDetails.get("heartRate").getAsInt();
+                        int deltaHeartRate = fallDetails.get("deltaHeartRate").getAsInt();
+                        double impactSeverity = fallDetails.get("impactSeverity").getAsDouble();
+                        String fallDirection = fallDetails.get("fallDirection").getAsString();
+
+                        // Log the parsed data
+                        Log.d(TAG, String.format("Parsed Fall Data - Time: %s, Date: %s, HR: %d, ΔHR: %d, Impact: %.1f, Direction: %s",
+                                time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
+
+                        // Add fall to Firebase and trigger notification
+                        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
+                        if (fireUser != null) {
+                            Intent intent = new Intent(BluetoothActivity.this, HomeActivity.class);
+                            intent.setAction("com.ece441.riskwatch.ADD_FALL");
+                            intent.putExtra("time", time);
+                            intent.putExtra("date", date);
+                            intent.putExtra("heartRate", heartRate);
+                            intent.putExtra("deltaHeartRate", deltaHeartRate);
+                            intent.putExtra("impactSeverity", impactSeverity);
+                            intent.putExtra("fallDirection", fallDirection);
+                            sendBroadcast(intent);
                         }
+
+                        runOnUiThread(() -> {
+                            appendLog("Received fall data: " + receivedData);
+                        });
                     } catch (Exception e) {
-                        Log.e(TAG, "Error parsing data: " + e.getMessage());
-                        Log.d(TAG, "Failed to parse data: " + receivedData);
+                        Log.e(TAG, "Error parsing fall data: " + e.getMessage());
+                        Log.d(TAG, "Raw data: " + receivedData);
                     }
-                    
-                    runOnUiThread(() -> {
-                        appendLog("Received: " + receivedData);
-                    });
                 }
             }
         }
@@ -428,5 +446,9 @@ public class BluetoothActivity extends AppCompatActivity {
                    }
                })
                .show();
+    }
+
+    private static class FallData {
+        JsonObject fallData;
     }
 }

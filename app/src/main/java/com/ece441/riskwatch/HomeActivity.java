@@ -57,6 +57,9 @@ import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.net.Uri;
 
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+
 public class HomeActivity extends AppCompatActivity {
 
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
@@ -69,6 +72,8 @@ public class HomeActivity extends AppCompatActivity {
 
     private LocationManager locationManager;
     private Geocoder geocoder;
+
+    private static String savedUsername = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,7 +97,13 @@ public class HomeActivity extends AppCompatActivity {
         if (receivedIntent != null) {
             String username = receivedIntent.getStringExtra("user");
             boolean isGuest = receivedIntent.getBooleanExtra("isGuest", false);
-            currentUser = new User(username);
+            
+            // Only update username if we received a new one
+            if (username != null) {
+                savedUsername = username;
+            }
+            
+            currentUser = new User(savedUsername != null ? savedUsername : "Guest");
             Log.d(TAG, "HOME USERNAME " + currentUser.getUserName());
             
             if (!isGuest) {
@@ -181,6 +192,15 @@ public class HomeActivity extends AppCompatActivity {
         });
 
         createNotificationChannel();
+
+        IntentFilter filter = new IntentFilter("com.ece441.riskwatch.ADD_FALL");
+        registerReceiver(fallReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(fallReceiver);
     }
 
     private void showSettingsDialog() {
@@ -225,7 +245,6 @@ public class HomeActivity extends AppCompatActivity {
                 try {
                     Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                     if (lastLocation != null) {
-                        // Generate fallId first
                         DatabaseReference fallsRef = FirebaseDatabase.getInstance()
                             .getReference("users")
                             .child(fireUser.getUid())
@@ -233,43 +252,88 @@ public class HomeActivity extends AppCompatActivity {
                         String fallId = fallsRef.push().getKey();
                         
                         if (fallId != null) {
-                            double latitude = lastLocation.getLatitude();
-                            double longitude = lastLocation.getLongitude();
-                            String address = "Unknown location";
+                            // Base coordinates for random generation
+                            double randBaseLatitude = lastLocation.getLatitude();
+                            double randBaseLongitude = lastLocation.getLongitude();
                             
+                            // Random offset for simulated falls
+                            double randLatOffset = (Math.random() - 0.5) * 0.01;
+                            double randLonOffset = (Math.random() - 0.5) * 0.01;
+                            
+                            // Final random coordinates
+                            double randLatitude = randBaseLatitude + randLatOffset;
+                            double randLongitude = randBaseLongitude + randLonOffset;
+                            
+                            // Get address for random location
+                            String randAddress = "Unknown location";
                             try {
-                                List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                                List<Address> addresses = geocoder.getFromLocation(randLatitude, randLongitude, 1);
                                 if (!addresses.isEmpty()) {
-                                    Address addr = addresses.get(0);
-                                    address = addr.getAddressLine(0);
+                                    randAddress = addresses.get(0).getAddressLine(0);
                                 }
                             } catch (Exception e) {
                                 Log.e(TAG, "Error getting address: " + e.getMessage());
                             }
+
+                            // Generate realistic fall data
+                            // Time: More likely during morning and evening hours
+                            int hour = (int) (Math.random() * 24);
+                            boolean isMorningOrEvening = hour < 10 || hour > 17; // Higher chance of falls
+                            if (!isMorningOrEvening && Math.random() > 0.3) { // 70% chance to regenerate if not morning/evening
+                                hour = Math.random() > 0.5 ? (int)(Math.random() * 10) : (int)(Math.random() * 6) + 18;
+                            }
                             
-                            // Create a Map to hold all fall data
+                            String time = String.format("%02d:%02d", hour, (int)(Math.random() * 60));
+                            
+                            // Current date
+                            SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yy", Locale.getDefault());
+                            String date = dateFormat.format(new Date());
+                            
+                            // Heart rate: Base rate 60-80 for elderly
+                            int baseHeartRate = 60 + (int)(Math.random() * 20);
+                            int heartRate = baseHeartRate + (int)(Math.random() * 40); // Increase during fall
+                            int deltaHeartRate = heartRate - baseHeartRate;
+                            
+                            // Impact severity: Usually moderate, occasionally severe
+                            double impactSeverity = Math.random();
+                            if (impactSeverity > 0.8) { // 20% chance of severe fall
+                                impactSeverity = 2.0 + Math.random() * 1.0; // Severe: 2.0-3.0
+                            } else {
+                                impactSeverity = 0.5 + Math.random() * 1.5; // Moderate: 0.5-2.0
+                            }
+                            
+                            // Fall direction: More common to fall forward or sideways
+                            String[] directions = {"Forward", "Backward", "Left", "Right"};
+                            int dirIndex = (int)(Math.random() * 100);
+                            String fallDirection;
+                            if (dirIndex < 40) fallDirection = "Forward";      // 40% forward
+                            else if (dirIndex < 60) fallDirection = "Backward"; // 20% backward
+                            else if (dirIndex < 80) fallDirection = "Left";     // 20% left
+                            else fallDirection = "Right";                       // 20% right
+
+                            // Create fall data map with random values
                             Map<String, Object> fallData = new HashMap<>();
-                            String currentTime = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
-                            fallData.put("time", currentTime);
-                            fallData.put("date", "03/20/24");
-                            fallData.put("deltaHeartRate", 20);
-                            fallData.put("heartRate", 100);
-                            fallData.put("fallDirection", "Left");
-                            fallData.put("impactSeverity", 0.4);
-                            fallData.put("latitude", latitude);
-                            fallData.put("longitude", longitude);
-                            fallData.put("address", address);
-                            
-                            // Write all data at once
+                            fallData.put("latitude", randLatitude);
+                            fallData.put("longitude", randLongitude);
+                            fallData.put("address", randAddress);
+                            fallData.put("time", time);
+                            fallData.put("date", date);
+                            fallData.put("heartRate", heartRate);
+                            fallData.put("deltaHeartRate", deltaHeartRate);
+                            fallData.put("impactSeverity", impactSeverity);
+                            fallData.put("fallDirection", fallDirection);
+
+                            assert fallId != null;
                             fallsRef.child(fallId).setValue(fallData);
-                            showFallNotification(currentTime, address, 0.4, latitude, longitude);
+                            
+                            // Show notification
+                            showFallNotification(time, randAddress, impactSeverity, randLatitude, randLongitude);
                         }
                     } else {
                         Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
                     }
                 } catch (SecurityException e) {
                     Log.e(TAG, "Error accessing location: " + e.getMessage());
-                    Toast.makeText(this, "Location access error", Toast.LENGTH_SHORT).show();
                 }
             } else {
                 Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
@@ -618,4 +682,24 @@ public class HomeActivity extends AppCompatActivity {
             notificationManager.createNotificationChannel(channel);
         }
     }
+
+    private BroadcastReceiver fallReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if ("com.ece441.riskwatch.ADD_FALL".equals(intent.getAction())) {
+                String time = intent.getStringExtra("time");
+                String date = intent.getStringExtra("date");
+                int heartRate = intent.getIntExtra("heartRate", 0);
+                int deltaHeartRate = intent.getIntExtra("deltaHeartRate", 0);
+                double impactSeverity = intent.getDoubleExtra("impactSeverity", 0.0);
+                String fallDirection = intent.getStringExtra("fallDirection");
+
+                FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
+                if (fireUser != null) {
+                    addFallEntry(fireUser.getUid(), time, date, deltaHeartRate, 
+                        heartRate, fallDirection, impactSeverity);
+                }
+            }
+        }
+    };
 }
