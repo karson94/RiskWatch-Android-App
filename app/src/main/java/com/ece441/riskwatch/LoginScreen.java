@@ -94,12 +94,12 @@ public class LoginScreen extends AppCompatActivity {
             return;
         }
 
-        // If password is empty, treat it as a guest username login
+        // If password is empty, treat it as a guest login
         if (password.isEmpty()) {
             mAuth.signInAnonymously().addOnCompleteListener(this, task -> {
                 if (task.isSuccessful()) {
                     Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
-                    intent.putExtra("user", input);  // Use the entered username
+                    intent.putExtra("user", "Guest");  // Always use "Guest" for anonymous users
                     intent.putExtra("isGuest", true);
                     startActivity(intent);
                 } else {
