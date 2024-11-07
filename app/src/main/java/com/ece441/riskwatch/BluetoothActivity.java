@@ -199,10 +199,12 @@ public class BluetoothActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         // Restore connection state
-        if (persistentGatt != null && isConnected) {
+        if (persistentGatt != null) {
             bluetoothGatt = persistentGatt;
-            // Refresh the GATT connection
-            bluetoothGatt.connect();
+            // Only attempt to connect if we're not already connected
+            if (!isConnected) {
+                bluetoothGatt.connect();
+            }
             runOnUiThread(() -> {
                 btnSend.setEnabled(true);
                 if (bluetoothGatt.getDevice() != null) {
