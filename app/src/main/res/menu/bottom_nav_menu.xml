@@ -9,6 +9,10 @@
         android:icon="@drawable/ic_bluetooth"
         android:title="Bluetooth"/>
     <item
+        android:id="@+id/navigation_analysis"
+        android:icon="@drawable/ic_analytics"
+        android:title="Analysis"/>
+    <item
         android:id="@+id/navigation_settings"
         android:icon="@drawable/ic_settings"
         android:title="Settings"/>
