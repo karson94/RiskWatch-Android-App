@@ -83,22 +83,37 @@ public class LoginScreen extends AppCompatActivity {
         }
     }
 
-    public void login(View view){
-
+    public void login(View view) {
         EditText editUsername = findViewById(R.id.userNameInput);
         EditText editPassword = findViewById(R.id.passwordInput);
-        String email = editUsername.getText().toString().trim();
+        String input = editUsername.getText().toString().trim();
         String password = editPassword.getText().toString().trim();
 
-        if (email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
+        if (input.isEmpty()) {
+            Toast.makeText(this, "Please enter a username or email", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        mAuth.signInWithEmailAndPassword(email, password)
+        // If password is empty, treat it as a guest login
+        if (password.isEmpty()) {
+            mAuth.signInAnonymously().addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+                    intent.putExtra("user", "Guest");  // Always use "Guest" for anonymous users
+                    intent.putExtra("isGuest", true);
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(LoginScreen.this, "Guest login failed.",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+            return;
+        }
+
+        // Regular email/password login
+        mAuth.signInWithEmailAndPassword(input, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        // Sign in success, update UI with the signed-in user's information
                         FirebaseUser fireUser = mAuth.getCurrentUser();
                         if (fireUser != null) {
                             Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
@@ -107,8 +122,8 @@ public class LoginScreen extends AppCompatActivity {
                             startActivity(intent);
                         }
                     } else {
-                        // If sign in fails, display a message to the user.
-                        Toast.makeText(LoginScreen.this, "Authentication failed. " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginScreen.this, "Authentication failed. " + 
+                            task.getException().getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -123,14 +138,12 @@ public class LoginScreen extends AppCompatActivity {
         mAuth.signInAnonymously()
             .addOnCompleteListener(this, task -> {
                 if (task.isSuccessful()) {
-                    // Sign in success
                     Log.d(TAG, "signInAnonymously:success");
                     Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
                     intent.putExtra("user", "Guest");
                     intent.putExtra("isGuest", true);
                     startActivity(intent);
                 } else {
-                    // If sign in fails, display a message to the user
                     Log.w(TAG, "signInAnonymously:failure", task.getException());
                     Toast.makeText(LoginScreen.this, "Anonymous authentication failed.",
                             Toast.LENGTH_SHORT).show();
