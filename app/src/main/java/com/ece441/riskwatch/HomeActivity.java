@@ -3,45 +3,24 @@ package com.ece441.riskwatch;
 import static android.content.ContentValues.TAG;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import java.util.Set;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 // Firebase imports
 import com.google.firebase.database.*;
-import com.google.firebase.ktx.Firebase;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -50,7 +29,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import java.util.Random;
+import android.location.Location;
+import android.location.LocationManager;
+import android.location.Geocoder;
+import android.location.Address;
+import java.util.List;
+import java.util.Locale;
+
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class HomeActivity extends AppCompatActivity {
 
@@ -62,21 +49,38 @@ public class HomeActivity extends AppCompatActivity {
 
     boolean startup = true;
 
+    private LocationManager locationManager;
+    private Geocoder geocoder;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        Intent intent = getIntent();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                },
+                1);
+        }
 
+        Intent intent = getIntent();
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
 
         if (intent != null) {
             String username = intent.getStringExtra("user");
+            boolean isGuest = intent.getBooleanExtra("isGuest", false);
             currentUser = new User(username);
             Log.d(TAG, "HOME USERNAME " + currentUser.getUserName());
-            assert fireUser != null;
-            Log.d(TAG, "FireAuth UID: " + fireUser.getUid());
+            
+            if (!isGuest) {
+                // Only assert fireUser for non-guest users
+                assert fireUser != null;
+                Log.d(TAG, "FireAuth UID: " + fireUser.getUid());
+            }
         }
 
         initRead();
@@ -133,6 +137,34 @@ public class HomeActivity extends AppCompatActivity {
 
         // Start thread
         thread.start();
+
+        BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.navigation_bluetooth) {
+                openBluetoothActivity(null);
+                return true;
+            } else if (itemId == R.id.navigation_settings) {
+                showSettingsDialog();
+                return true;
+            } else if (itemId == R.id.navigation_home) {
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void showSettingsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Settings")
+               .setItems(new CharSequence[]{"Account Linking", "Logout"}, (dialog, which) -> {
+                   if (which == 0) {
+                       accountLink(null);
+                   } else if (which == 1) {
+                       logOut(null);
+                   }
+               })
+               .show();
     }
 
     // Android "Toast" notif. Only appears in app
@@ -154,30 +186,114 @@ public class HomeActivity extends AppCompatActivity {
     // Does this via addFallEntry
     public void addRandFall(View view) {
         FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
-        addFallEntry(fireUser.getUid(), "03:02 AM", "03/20/24", 20, 100, "Left", 0.4);
+        if (fireUser != null) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                    == PackageManager.PERMISSION_GRANTED) {
+                
+                locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                geocoder = new Geocoder(this, Locale.getDefault());
+                
+                try {
+                    Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                    if (lastLocation != null) {
+                        // Generate fallId first
+                        DatabaseReference fallsRef = FirebaseDatabase.getInstance()
+                            .getReference("users")
+                            .child(fireUser.getUid())
+                            .child("falls");
+                        String fallId = fallsRef.push().getKey();
+                        
+                        if (fallId != null) {
+                            double latitude = lastLocation.getLatitude();
+                            double longitude = lastLocation.getLongitude();
+                            String address = "Unknown location";
+                            
+                            try {
+                                List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                                if (!addresses.isEmpty()) {
+                                    Address addr = addresses.get(0);
+                                    address = addr.getAddressLine(0);
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error getting address: " + e.getMessage());
+                            }
+                            
+                            // Create a Map to hold all fall data
+                            Map<String, Object> fallData = new HashMap<>();
+                            fallData.put("time", "03:02 AM");
+                            fallData.put("date", "03/20/24");
+                            fallData.put("deltaHeartRate", 20);
+                            fallData.put("heartRate", 100);
+                            fallData.put("fallDirection", "Left");
+                            fallData.put("impactSeverity", 0.4);
+                            fallData.put("latitude", latitude);
+                            fallData.put("longitude", longitude);
+                            fallData.put("address", address);
+                            
+                            // Write all data at once
+                            fallsRef.child(fallId).setValue(fallData);
+                        }
+                    } else {
+                        Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (SecurityException e) {
+                    Log.e(TAG, "Error accessing location: " + e.getMessage());
+                    Toast.makeText(this, "Location access error", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     // Gets passed fall metrics, creates new fall in database for current user
     public void addFallEntry(String userId, String time, String date,
                              int deltaHeartRate, int heartRate, String fallDirection, double impactSeverity) {
-        // Get a reference to the "users" directory in the Firebase Realtime Database
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference usersRef = database.getReference("users");
-
-        // Get a reference to the "falls" directory under the specific user
         DatabaseReference fallsRef = usersRef.child(userId).child("falls");
 
-        // Generate a unique key for the new fall entry
         String fallId = fallsRef.push().getKey();
         assert fallId != null;
 
-        // Write the fall data to the database under the generated fall ID
-        fallsRef.child(fallId).child("time").setValue(time);
-        fallsRef.child(fallId).child("date").setValue(date);
-        fallsRef.child(fallId).child("deltaHeartRate").setValue(deltaHeartRate);
-        fallsRef.child(fallId).child("heartRate").setValue(heartRate);
-        fallsRef.child(fallId).child("fallDirection").setValue(fallDirection);
-        fallsRef.child(fallId).child("impactSeverity").setValue(impactSeverity);
+        // Get location data first
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                == PackageManager.PERMISSION_GRANTED) {
+            
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            geocoder = new Geocoder(this, Locale.getDefault());
+            
+            Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (lastLocation != null) {
+                double latitude = lastLocation.getLatitude();
+                double longitude = lastLocation.getLongitude();
+                String address = "Unknown location";
+                
+                try {
+                    List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                    if (!addresses.isEmpty()) {
+                        Address addr = addresses.get(0);
+                        address = addr.getAddressLine(0);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error getting address: " + e.getMessage());
+                }
+
+                // Write all fall data including location to Firebase
+                Map<String, Object> fallData = new HashMap<>();
+                fallData.put("time", time);
+                fallData.put("date", date);
+                fallData.put("deltaHeartRate", deltaHeartRate);
+                fallData.put("heartRate", heartRate);
+                fallData.put("fallDirection", fallDirection);
+                fallData.put("impactSeverity", impactSeverity);
+                fallData.put("latitude", latitude);
+                fallData.put("longitude", longitude);
+                fallData.put("address", address);
+
+                fallsRef.child(fallId).setValue(fallData);
+            }
+        }
     }
 
     // Needs to get re-organized. Is the main function that checks if the current user is just a "listener" or if they are the senior
@@ -266,6 +382,10 @@ public class HomeActivity extends AppCompatActivity {
                     double impactSeverity = fallSnapshot.child("impactSeverity").getValue(Double.class);
                     String fallDirection = fallSnapshot.child("fallDirection").getValue(String.class);
 
+                    double latitude = fallSnapshot.child("latitude").getValue(Double.class);
+                    double longitude = fallSnapshot.child("longitude").getValue(Double.class);
+                    String address = fallSnapshot.child("address").getValue(String.class);
+
                     boolean fallExists = false;
                     for (Fall fall : fallArrayList) {
                         if (fall.getfallID().equals(fallID)) {
@@ -275,13 +395,13 @@ public class HomeActivity extends AppCompatActivity {
                     }
 
                     if (!fallExists) {
-                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, impactSeverity, fallDirection));
+                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, 
+                            impactSeverity, fallDirection, latitude, longitude, address));
                         fallItemAdapter.notifyItemInserted(0);
                         recyclerView.scrollToPosition(0);
 
                         if (!startup) {
-//                            notifyFallToast(HomeActivity.this);
-
+                        // notifyFallToast(HomeActivity.this);
                         }
                     }
                 }
@@ -315,114 +435,58 @@ public class HomeActivity extends AppCompatActivity {
         usersRef.child(userId).child("name").setValue(userName);
     }
 
-    // ANYTHING AFTER THIS IS BLUETOOTH BUT UNTESTED/INCORRECT
+    // Bluetooth
+    public void openBluetoothActivity(View view) {
+        Intent intent = new Intent(this, BluetoothActivity.class);
+        startActivity(intent);
+    }
 
-    public class BluetoothDataReceiverActivity extends AppCompatActivity {
-
-        private static final String TAG = "BluetoothDataReceiver";
-
-        private BluetoothAdapter bluetoothAdapter;
-        private BluetoothGatt bluetoothGatt;
-        String deviceAddress = "00:11:22:33:44:55";
-
-//        private BluetoothGattCharacteristic = "0000dfb1-0000-1000-8000-00805f9b34fb";
-
-        private final BluetoothGattCallback bluetoothGattCallback = new BluetoothGattCallback() {
-            @SuppressLint("MissingPermission")
-            @Override
-            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-                super.onConnectionStateChange(gatt, status, newState);
-                if (newState == BluetoothGatt.STATE_CONNECTED) {
-                    Log.d(TAG, "BluetoothGattCallback: Device connected");
-                    // Discover services when connected
-                    gatt.discoverServices();
-                } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
-                    Log.d(TAG, "BluetoothGattCallback: Device disconnected");
-                    // Handle device disconnection
+    private void addLocationToFall(String fallId) {
+        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (fireUser != null && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+                == PackageManager.PERMISSION_GRANTED) {
+            
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            geocoder = new Geocoder(this, Locale.getDefault());
+            
+            Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (lastLocation != null) {
+                double latitude = lastLocation.getLatitude();
+                double longitude = lastLocation.getLongitude();
+                String address = "Unknown location";
+                
+                try {
+                    List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                    if (!addresses.isEmpty()) {
+                        Address addr = addresses.get(0);
+                        address = addr.getAddressLine(0);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error getting address: " + e.getMessage());
                 }
+
+                // Update Firebase with location data
+                DatabaseReference fallRef = FirebaseDatabase.getInstance()
+                    .getReference("users")
+                    .child(fireUser.getUid())
+                    .child("falls")
+                    .child(fallId);
+                    
+                fallRef.child("latitude").setValue(latitude);
+                fallRef.child("longitude").setValue(longitude);
+                fallRef.child("address").setValue(address);
             }
-
-            @Override
-            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-                super.onCharacteristicChanged(gatt, characteristic);
-                // Received data from Bluetooth device
-                byte[] data = characteristic.getValue();
-                if (data != null) {
-                    String receivedData = new String(data); // Convert byte array to String
-                    Log.d(TAG, "Received data from Bluetooth device: " + receivedData);
-                    // Process received data as needed
-                    processData(receivedData);
-                }
-            }
-        };
-
-        @SuppressLint("MissingPermission")
-        @Override
-        protected void onCreate(@Nullable Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
-
-            // Initialize BluetoothAdapter
-            BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-            if (bluetoothManager != null) {
-                bluetoothAdapter = bluetoothManager.getAdapter();
-            }
-
-            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-
-            for (BluetoothDevice device : pairedDevices) {
-                if ("RiskWatch".equals(device.getName())) {
-                    // Found the device named "RiskWatch", retrieve its address
-                    String deviceName = device.getName();
-                    deviceAddress = device.getAddress();
-                    Log.d(TAG, "Found device: " + deviceName + ", Address: " + deviceAddress);
-                    break; // Exit loop after finding the device
-                }
-            }
-
-
-            // Example: Connect to a specific Bluetooth device (already paired)
-            deviceAddress = "";
-            BluetoothDevice bluetoothDevice = bluetoothAdapter.getRemoteDevice(deviceAddress);
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                return;
-            }
-            bluetoothGatt = bluetoothDevice.connectGatt(this, false, bluetoothGattCallback);
-        }
-
-        @Override
-        protected void onDestroy() {
-            super.onDestroy();
-            // Clean up resources
-            if (bluetoothGatt != null) {
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                    // TODO: Consider calling
-                    //    ActivityCompat#requestPermissions
-                    // here to request the missing permissions, and then overriding
-                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                    //                                          int[] grantResults)
-                    // to handle the case where the user grants the permission. See the documentation
-                    // for ActivityCompat#requestPermissions for more details.
-                    return;
-                }
-                bluetoothGatt.disconnect();
-                bluetoothGatt.close();
-                bluetoothGatt = null;
-            }
-        }
-
-        private void processData(String data) {
-            notifyFallToast(HomeActivity.this);
-            // Process the received data, update UI, or trigger further actions
-            // Example: Update UI with received data
-            // textView.setText(data);
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted
+                Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
 }
