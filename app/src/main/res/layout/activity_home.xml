@@ -4,122 +4,87 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#377FC2"
+    android:background="#293E56"
     tools:context=".HomeActivity">
 
-    <TextView
-        android:id="@+id/riskWatchText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/share_tech_mono"
-        android:shadowColor="#000000"
-        android:text="@string/riskwatch"
-        android:textColor="#FFF9FDFF"
-        android:textSize="34sp"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView7"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias=".5"
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/riskwatch_logov4"
+        android:layout_margin="16dp"
+        android:elevation="6dp"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/imageView7" />
+        android:contentDescription="RiskWatch Logo"/>
 
-    <TextView
-        android:id="@+id/batteryLevel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:fontFamily="@font/share_tech_mono"
-        android:text="@string/battery_100"
-        android:textColor="#000000"
-        app:layout_constraintEnd_toEndOf="@+id/riskWatchText"
-        app:layout_constraintHorizontal_bias="0.498"
-        app:layout_constraintStart_toStartOf="@+id/riskWatchText"
-        app:layout_constraintTop_toBottomOf="@+id/riskWatchText" />
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#377FC2"
+        android:elevation="4dp"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/riskWatchText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:fontFamily="@font/share_tech_mono"
+            android:text="@string/riskwatch"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/userNameView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginEnd="16dp"
+            android:fontFamily="@font/share_tech_mono"
+            android:text="@string/hi_user"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
+    </androidx.appcompat.widget.Toolbar>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/fallRecycler"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="16dp"
-        android:background="#293E56"
-        android:padding="15dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="8dp"
+        android:background="#1A2634"
+        android:padding="8dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/batteryLevel" />
+        app:layout_constraintTop_toBottomOf="@+id/toolbar" />
 
-    <ImageView
-        android:id="@+id/imageView7"
-        android:layout_width="0dp"
-        android:layout_height="80dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp"
-        android:contentDescription="@string/riskwatch_logo"
-        app:layout_constraintEnd_toStartOf="@+id/riskWatchText"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@drawable/riskwatch_logov4" />
-
-    <Button
-        android:id="@+id/logOutButton"
-        android:layout_width="55dp"
-        android:layout_height="35dp"
-        android:fontFamily="@font/share_tech_mono"
-        android:onClick="logOut"
-        android:padding="0dp"
-        android:text="@string/log_out"
-        android:textSize="10sp"
-        android:textColor="#FFF9FDFF"
-        app:layout_constraintBottom_toBottomOf="@+id/imageView7"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias=".5"
-        app:layout_constraintStart_toEndOf="@+id/riskWatchText"
-        app:layout_constraintTop_toBottomOf="@+id/userNameView"
-        app:layout_constraintVertical_bias="0.25"
-        tools:ignore="SmallSp" />
-
-    <TextView
-        android:id="@+id/userNameView"
-        android:layout_width="80dp"
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:fontFamily="@font/share_tech_mono"
-        android:text="@string/hi_user"
-        android:textAlignment="center"
-        android:textColor="@color/colorPrimaryDark"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/riskWatchText"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:background="#377FC2"
+        app:itemIconTint="@color/white"
+        app:itemTextColor="@color/white"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:menu="@menu/bottom_nav_menu" />
 
-    <Button
-        android:id="@+id/linkButton"
-        android:layout_width="55dp"
-        android:layout_height="35dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="12dp"
-        android:fontFamily="@font/share_tech_mono"
-        android:onClick="accountLink"
-        android:padding="0dp"
-        android:text="@string/account_linking"
-        android:textSize="10sp"
-        android:textColor="#FFF9FDFF"
-        app:layout_constraintBottom_toTopOf="@+id/fallRecycler"
-        app:layout_constraintEnd_toEndOf="@+id/logOutButton"
-        app:layout_constraintStart_toStartOf="@+id/logOutButton"
-        app:layout_constraintTop_toBottomOf="@+id/logOutButton"
-        tools:ignore="SmallSp" />
-
-    <Button
-        android:id="@+id/addFall"
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_fall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
-        android:textColor="#FFF9FDFF"
+        android:layout_margin="16dp"
+        android:contentDescription="Add random fall"
         android:onClick="addRandFall"
-        android:text="@string/add_fall"
-        app:layout_constraintBottom_toBottomOf="@+id/fallRecycler"
+        android:src="@drawable/ic_add"
+        app:backgroundTint="#377FC2"
+        app:tint="@color/white"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
         app:layout_constraintEnd_toEndOf="parent" />
-
 
 </androidx.constraintlayout.widget.ConstraintLayout>

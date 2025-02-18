@@ -40,6 +40,7 @@ public class FallItemAdapter extends RecyclerView.Adapter<MyViewHolder> {
         holder.fallEventImpSev.setText(fall.getImpactSeverity() + "g");
         holder.fallEventHR.setText(fall.getHeartRate() + "bpm");
         holder.fallEventFallDir.setText(fall.getFallDirection());
+        holder.fallEventLocation.setText(fall.getAddress());
 
         String severity;
         String deltaHR;
