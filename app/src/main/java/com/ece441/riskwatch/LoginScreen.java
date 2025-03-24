@@ -14,11 +14,22 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 import com.google.firebase.auth.*;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.amazon.identity.auth.device.AuthError;
+import com.amazon.identity.auth.device.api.authorization.AuthorizationManager;
+import com.amazon.identity.auth.device.api.authorization.AuthorizeRequest;
+import com.amazon.identity.auth.device.api.authorization.AuthorizeResult;
+import com.amazon.identity.auth.device.api.workflow.RequestContext;
+import com.amazon.identity.auth.device.api.authorization.AuthorizeListener;
+import com.amazon.identity.auth.device.api.authorization.ProfileScope;
+import com.amazon.identity.auth.device.api.authorization.AuthCancellation;
 
 public class LoginScreen extends AppCompatActivity {
 
     public User user;
     private FirebaseAuth mAuth;
+    private RequestContext requestContext; // Amazon Login context
 
     // Register for the activity result launchers
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
@@ -50,10 +61,60 @@ public class LoginScreen extends AppCompatActivity {
         setContentView(R.layout.activity_login_screen);
         mAuth = FirebaseAuth.getInstance();
         
+        // Initialize Amazon Login
+        requestContext = RequestContext.create(this);
+        requestContext.registerListener(new AuthorizeListener() {
+            @Override
+            public void onSuccess(AuthorizeResult result) {
+                // Handle successful Amazon login
+                runOnUiThread(() -> {
+                    Log.d(TAG, "Amazon Login successful");
+                    user = new User(result.getUser().getUserId());
+                    Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+                    intent.putExtra("user", result.getUser().getUserName());
+                    intent.putExtra("amazon_user_id", result.getUser().getUserId());
+                    startActivity(intent);
+                });
+            }
+
+            @Override
+            public void onError(AuthError ae) {
+                // Handle Amazon login error
+                runOnUiThread(() -> {
+                    Log.e(TAG, "Amazon Login error: " + ae.getMessage());
+                    Toast.makeText(LoginScreen.this, 
+                        "Amazon Login Failed: " + ae.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onCancel(AuthCancellation cancellation) {
+                // Handle when user cancels the login process
+                runOnUiThread(() -> {
+                    Log.d(TAG, "Amazon Login cancelled by user");
+                    Toast.makeText(LoginScreen.this, 
+                        "Login cancelled", 
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+        
         // Check all required permissions
         checkNotificationPermission();
         checkBluetoothPermissions();
         checkLocationPermissions();
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        requestContext.onResume();
+    }
+    
+    @Override
+    protected void onStart() {
+        super.onStart();
     }
 
     // Permission check methods
@@ -150,5 +211,14 @@ public class LoginScreen extends AppCompatActivity {
                 }
             });
     }
-
+    
+    // Amazon Login methods - simplified for testing
+    public void loginWithAmazon(View view) {
+        Log.d(TAG, "Amazon Login initiated");
+        AuthorizationManager.authorize(
+            new AuthorizeRequest.Builder(requestContext)
+                .addScopes(ProfileScope.profile())
+                .build()
+        );
+    }
 }

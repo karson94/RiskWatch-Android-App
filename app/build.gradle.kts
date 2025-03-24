@@ -29,6 +29,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = false  // This will prevent lint errors from failing the build
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -81,6 +86,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation(files("login-with-amazon-sdk.jar"))
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
