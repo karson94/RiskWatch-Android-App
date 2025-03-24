@@ -104,11 +104,9 @@
         android:fontFamily="@font/share_tech_mono"
         android:onClick="goToRegistration"
         android:text="@string/go_to_register"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="@+id/loginButton"
         app:layout_constraintStart_toStartOf="@+id/loginButton"
-        app:layout_constraintTop_toBottomOf="@+id/loginButton"
-        app:layout_constraintVertical_bias="0.0" />
+        app:layout_constraintTop_toBottomOf="@+id/loginButton" />
 
     <Button
         android:id="@+id/guestLoginButton"
@@ -118,10 +116,22 @@
         android:fontFamily="@font/share_tech_mono"
         android:onClick="guestLogin"
         android:text="Guest Login"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="@+id/registerButton"
         app:layout_constraintStart_toStartOf="@+id/registerButton"
-        app:layout_constraintTop_toBottomOf="@+id/registerButton"
-        app:layout_constraintVertical_bias="0.0" />
+        app:layout_constraintTop_toBottomOf="@+id/registerButton" />
+
+    <!-- Amazon Login Button -->
+    <Button
+        android:id="@+id/amazonLoginButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:fontFamily="@font/share_tech_mono"
+        android:onClick="loginWithAmazon"
+        android:text="Sign in with Amazon"
+        android:backgroundTint="#FF9900"
+        app:layout_constraintEnd_toEndOf="@+id/guestLoginButton"
+        app:layout_constraintStart_toStartOf="@+id/guestLoginButton"
+        app:layout_constraintTop_toBottomOf="@+id/guestLoginButton" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

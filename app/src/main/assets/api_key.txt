@@ -1,5 +1,0 @@
-{
-  "api_key": "YOUR_AMAZON_API_KEY",
-  "client_id": "YOUR_AMAZON_CLIENT_ID",
-  "client_secret": "YOUR_AMAZON_CLIENT_SECRET"
-} 
