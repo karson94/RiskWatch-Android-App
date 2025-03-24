@@ -35,4 +35,9 @@
     <string name="scan">Scan</string>
     <string name="scanning">Scanning...</string>
     <string name="disconnecting">Disconnecting...</string>
+    <string name="your_alexa_devices">Your Alexa Devices</string>
+    <string name="sign_in_with_amazon">Sign in with Amazon</string>
+    <string name="amazon_login_success">Successfully signed in with Amazon</string>
+    <string name="amazon_login_error">Error signing in with Amazon</string>
+    <string name="link_amazon_account">Link Amazon Account</string>
 </resources>
