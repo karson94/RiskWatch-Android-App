@@ -865,53 +865,47 @@ public class HomeActivity extends AppCompatActivity {
 
     private void sendProactiveEventInternal(Fall fallDetails) {
         final String currentToken = proactiveEventsAccessToken;
-        final String userIdToSend = amazonUserId; // Use the specific user ID again
+        // final String userIdToSend = amazonUserId; // Commented out as we are testing Multicast
 
         networkExecutor.execute(() -> {
             HttpURLConnection connection = null;
             try {
-                // 1. Construct the Event Payload JSON for AMAZON.Occasion.Updated
+                // 1. Construct the Event Payload JSON for AMAZON.MessageAlert.Activated
                 JSONObject eventPayload = new JSONObject();
-                eventPayload.put("name", "AMAZON.Occasion.Updated"); // Changed event name
+                eventPayload.put("name", "AMAZON.MessageAlert.Activated"); // Reverted event name
 
-                JSONObject occasionPayload = new JSONObject();
-                occasionPayload.put("state", "CONFIRMED"); // State of the occasion (e.g., CONFIRMED, CANCELED)
-                occasionPayload.put("bookingTime", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date()));
+                JSONObject payloadDetails = new JSONObject();
+                JSONObject stateObject = new JSONObject();
+                stateObject.put("status", "UNREAD"); // Correct state object structure
+                payloadDetails.put("state", stateObject);
 
-                JSONObject provider = new JSONObject();
-                provider.put("name", "localizedattribute:providerName");
-                occasionPayload.put("provider", provider);
+                payloadDetails.put("messageGroup", new JSONObject() // Standard MessageAlert structure
+                    .put("creator", new JSONObject().put("name", "RiskWatch Alert"))
+                    .put("count", 1)
+                 );
+                eventPayload.put("payload", payloadDetails);
 
-                occasionPayload.put("subject", "localizedattribute:occasionSubject");
-
-                eventPayload.put("payload", occasionPayload);
 
                 // 2. Construct the Full Request Body JSON
-                JSONObject requestBody = new JSONObject();
-                requestBody.put("timestamp", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date()));
-                requestBody.put("referenceId", UUID.randomUUID().toString()); // Use UUID
-                requestBody.put("expiryTime", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date(System.currentTimeMillis() + 3600 * 1000 * 24)));
-                requestBody.put("event", eventPayload);
+                 JSONObject requestBody = new JSONObject();
+                 requestBody.put("timestamp", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date()));
+                 requestBody.put("referenceId", UUID.randomUUID().toString()); // Using UUID
+                 requestBody.put("expiryTime", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date(System.currentTimeMillis() + 3600 * 1000 * 24)));
+                 requestBody.put("event", eventPayload);
 
-                // --- Add Localized Attributes ---
-                JSONArray localizedAttributes = new JSONArray();
-                JSONObject enUSAttributes = new JSONObject();
-                enUSAttributes.put("locale", "en-US");
-                enUSAttributes.put("providerName", "RiskWatch");
-                enUSAttributes.put("occasionSubject", "Fall Detected Alert");
-                localizedAttributes.put(enUSAttributes);
-                requestBody.put("localizedAttributes", localizedAttributes);
-                // --- End Localized Attributes ---
+                 // --- Revert to Multicast for testing ---
+                 JSONObject relevantAudience = new JSONObject();
+                 relevantAudience.put("type", "Multicast");
+                 relevantAudience.put("payload", new JSONObject()); // Empty payload for Multicast
+                 requestBody.put("relevantAudience", relevantAudience);
+                 // --- End Multicast ---
 
-                // --- Switch back to Unicast ---
-                JSONObject relevantAudience = new JSONObject();
-                relevantAudience.put("type", "Unicast");
-                relevantAudience.put("payload", new JSONObject().put("user", userIdToSend));
-                requestBody.put("relevantAudience", relevantAudience);
-                // --- End Unicast ---
+                 // Remove localizedAttributes as they are not standard for MessageAlert
+                 // requestBody.put("localizedAttributes", localizedAttributes);
+
 
                 String jsonInputString = requestBody.toString();
-                Log.d(TAG, "Proactive Event Request Body (Occasion.Updated - Unicast): " + jsonInputString);
+                Log.d(TAG, "Proactive Event Request Body (Reverted to MessageAlert Multicast - Loading Credentials): " + jsonInputString);
 
                 // 3. Make the HTTP POST Request
                 URL url = new URL(PROACTIVE_EVENTS_API_ENDPOINT);
@@ -930,9 +924,9 @@ public class HomeActivity extends AppCompatActivity {
                 int responseCode = connection.getResponseCode();
                 Log.d(TAG, "Proactive Event POST response code: " + responseCode);
 
-                // ... (rest of response handling) ...
+                // ... (rest of response handling - keep the detailed logging) ...
                  if (responseCode >= 200 && responseCode < 300) {
-                    Log.i(TAG, "Successfully sent proactive event (Occasion.Updated) for fall ID: " + fallDetails.getfallID());
+                    Log.i(TAG, "Successfully sent proactive event (MessageAlert Multicast) for fall ID: " + fallDetails.getfallID());
                      if (connection.getInputStream() != null) {
                          BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                          String inputLine;
@@ -943,7 +937,7 @@ public class HomeActivity extends AppCompatActivity {
                          in.close();
                          Log.d(TAG, "Proactive Event Success Response: " + response.toString());
                      }
-                    mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Alexa notification sent.", Toast.LENGTH_SHORT).show()); // Add success toast
+                    mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Alexa notification sent (Multicast).", Toast.LENGTH_SHORT).show());
                 } else {
                      if (connection.getErrorStream() != null) {
                          BufferedReader in = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
@@ -960,7 +954,6 @@ public class HomeActivity extends AppCompatActivity {
                           mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Failed to send Alexa notification: " + responseCode, Toast.LENGTH_LONG).show());
                      }
                 }
-
 
             } catch (Exception e) {
                  Log.e(TAG, "Exception during proactive event sending: " + e.getMessage(), e);
