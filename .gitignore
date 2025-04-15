@@ -17,3 +17,6 @@ local.properties
 
 # Amazon API Key
 app/src/main/assets/api_key.txt
+
+# Alexa Skill
+app/src/main/assets/alexa_skill.json
