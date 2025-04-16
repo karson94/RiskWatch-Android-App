@@ -105,6 +105,8 @@ public class HomeActivity extends AppCompatActivity {
     private static final String PROACTIVE_EVENTS_API_ENDPOINT = "https://api.amazonalexa.com/v1/proactiveEvents/stages/development";
     // --- End Proactive Events Configuration ---
 
+    private static final String ALEXA_LOG_TAG = TAG; // Use the existing TAG for consistency or define a new one if preferred
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -742,46 +744,59 @@ public class HomeActivity extends AppCompatActivity {
             JSONObject credentials = new JSONObject(json);
             alexaSkillClientId = credentials.getString("clientId");
             alexaSkillClientSecret = credentials.getString("clientSecret");
-            Log.i(TAG, "Alexa Skill credentials loaded successfully.");
+            Log.i(ALEXA_LOG_TAG, "Alexa: Skill credentials loaded successfully. Client ID: " + alexaSkillClientId);
         } catch (IOException e) {
-            Log.e(TAG, "Error reading alexa_skill.json from assets", e);
+            Log.e(ALEXA_LOG_TAG, "Alexa: Error reading alexa_skill.json from assets", e);
             alexaSkillClientId = null;
             alexaSkillClientSecret = null;
+            mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Error reading Alexa credentials.", Toast.LENGTH_LONG).show());
         } catch (JSONException e) {
-            Log.e(TAG, "Error parsing JSON from alexa_skill.json", e);
+            Log.e(ALEXA_LOG_TAG, "Alexa: Error parsing JSON from alexa_skill.json", e);
             alexaSkillClientId = null;
             alexaSkillClientSecret = null;
+             mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Error parsing Alexa credentials.", Toast.LENGTH_LONG).show());
         }
     }
 
     private void getProactiveEventsAccessToken() {
         // Prevent multiple simultaneous token requests or if credentials failed to load
         if (alexaSkillClientId == null || alexaSkillClientSecret == null) {
-             Log.e(TAG, "Cannot get token: Alexa credentials not loaded.");
-             // Optionally show a persistent error message if this happens after initial load attempt
+             Log.e(ALEXA_LOG_TAG, "Alexa: Cannot get token: Credentials not loaded or invalid.");
              return;
         }
-        if (System.currentTimeMillis() < tokenExpiryTime - 60000) {
-             Log.d(TAG, "Using existing Proactive Events access token.");
+        // Check if token is still valid (give 1 min buffer)
+        if (proactiveEventsAccessToken != null && System.currentTimeMillis() < tokenExpiryTime - 60000) {
+             Log.d(ALEXA_LOG_TAG, "Alexa: Using existing valid Proactive Events access token.");
              return;
         }
-        // Removed check for placeholder strings
+        if (proactiveEventsAccessToken != null) {
+             Log.d(ALEXA_LOG_TAG, "Alexa: Existing token expired or nearing expiry. Requesting new one.");
+        } else {
+             Log.d(ALEXA_LOG_TAG, "Alexa: No existing token. Requesting new Proactive Events access token...");
+        }
 
-        Log.d(TAG, "Requesting new Proactive Events access token...");
+        // Ensure we are not already requesting a token (optional, simple check here)
+        // More robust solution would use AtomicBoolean or similar if high concurrency expected
+        // For simplicity, relying on single executor thread.
+
         networkExecutor.execute(() -> {
             HttpURLConnection connection = null;
+            Log.d(ALEXA_LOG_TAG, "Alexa: Starting background task to request token.");
             try {
                 URL url = new URL("https://api.amazon.com/auth/o2/token");
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("POST");
                 connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
                 connection.setDoOutput(true);
+                connection.setConnectTimeout(10000); // 10 seconds
+                connection.setReadTimeout(10000);    // 10 seconds
 
-                // Use loaded credentials here
+
                 String postData = "grant_type=client_credentials" +
                                   "&client_id=" + alexaSkillClientId +
                                   "&client_secret=" + alexaSkillClientSecret +
                                   "&scope=alexa::proactive_events";
+                Log.d(ALEXA_LOG_TAG, "Alexa: Token request data (credentials omitted): grant_type=client_credentials&scope=alexa::proactive_events");
 
                 DataOutputStream wr = new DataOutputStream(connection.getOutputStream());
                 wr.writeBytes(postData);
@@ -789,125 +804,193 @@ public class HomeActivity extends AppCompatActivity {
                 wr.close();
 
                 int responseCode = connection.getResponseCode();
-                Log.d(TAG, "Token request response code: " + responseCode);
+                Log.d(ALEXA_LOG_TAG, "Alexa: Token request response code: " + responseCode);
 
                 BufferedReader in;
-                if (responseCode >= 200 && responseCode < 300) {
-                    in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                } else {
-                    in = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-                }
-                String inputLine;
                 StringBuilder response = new StringBuilder();
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
-                }
-                in.close();
+                InputStream stream;
 
-                Log.d(TAG, "Token response body: " + response.toString());
+                if (responseCode >= 200 && responseCode < 300) {
+                    stream = connection.getInputStream();
+                } else {
+                    stream = connection.getErrorStream();
+                     Log.w(ALEXA_LOG_TAG, "Alexa: Token request failed with code: " + responseCode);
+                }
+
+                if (stream != null) {
+                    in = new BufferedReader(new InputStreamReader(stream));
+                    String inputLine;
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine);
+                    }
+                    in.close();
+                    Log.d(ALEXA_LOG_TAG, "Alexa: Token response body: " + response.toString());
+                } else {
+                     Log.e(ALEXA_LOG_TAG, "Alexa: Token request - response stream was null for code: " + responseCode);
+                }
+
 
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     JSONObject jsonResponse = new JSONObject(response.toString());
                     proactiveEventsAccessToken = jsonResponse.getString("access_token");
                     long expiresIn = jsonResponse.getLong("expires_in"); // Duration in seconds
                     tokenExpiryTime = System.currentTimeMillis() + (expiresIn * 1000);
-                    Log.i(TAG, "Successfully obtained Proactive Events access token.");
+                    Log.i(ALEXA_LOG_TAG, "Alexa: Successfully obtained Proactive Events access token. Expires in: " + expiresIn + " seconds.");
+                    // Log only part of the token for verification if needed, never the whole token
+                    // Log.d(ALEXA_LOG_TAG, "Alexa: Token starts with: " + (proactiveEventsAccessToken != null && proactiveEventsAccessToken.length() > 10 ? proactiveEventsAccessToken.substring(0, 10) : "N/A"));
                 } else {
-                    Log.e(TAG, "Error getting Proactive Events access token: " + response.toString());
+                    Log.e(ALEXA_LOG_TAG, "Alexa: Error getting Proactive Events access token. Code: " + responseCode + ", Body: " + response.toString());
                     proactiveEventsAccessToken = null;
                     tokenExpiryTime = 0;
+                    // Post error message to UI thread
                     mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Failed to get Alexa token: " + responseCode, Toast.LENGTH_LONG).show());
                 }
 
-            } catch (Exception e) {
-                Log.e(TAG, "Exception during token request: " + e.getMessage(), e);
+            } catch (Exception e) { // Catch broader exceptions like SocketTimeoutException
+                Log.e(ALEXA_LOG_TAG, "Alexa: Exception during token request: " + e.getClass().getSimpleName() + " - " + e.getMessage(), e);
                 proactiveEventsAccessToken = null;
                 tokenExpiryTime = 0;
                  mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Network error getting Alexa token.", Toast.LENGTH_LONG).show());
             } finally {
                 if (connection != null) {
                     connection.disconnect();
+                     Log.d(ALEXA_LOG_TAG, "Alexa: Token request connection disconnected.");
                 }
             }
         });
     }
 
     private void sendProactiveEventNotification(Fall fallDetails) {
+        Log.d(ALEXA_LOG_TAG, "Alexa: Preparing to send proactive event for fall ID: " + fallDetails.getfallID());
         // Check if credentials were loaded before proceeding
         if (alexaSkillClientId == null || alexaSkillClientSecret == null) {
-             Log.e(TAG, "Cannot send notification: Alexa credentials not loaded.");
+             Log.e(ALEXA_LOG_TAG, "Alexa: Cannot send notification: Credentials not loaded.");
               mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Error: Missing Alexa credentials.", Toast.LENGTH_LONG).show());
              return;
         }
 
-        // Ensure we have a user ID and a valid token
+        // Ensure we have a user ID
         if (amazonUserId == null || amazonUserId.isEmpty()) {
-            Log.w(TAG, "Cannot send proactive event, Amazon User ID is missing.");
-            return;
+            // This is only an error if we intend to use Unicast later, but log warning for now
+            Log.w(ALEXA_LOG_TAG, "Alexa: Amazon User ID is missing. Cannot send Unicast events.");
+            // Decide if you want to prevent *all* sends or just Unicast
+             // For now, let's allow Multicast attempts if needed.
+             // return; // Uncomment this line if a user ID is absolutely required for any send attempt
         }
-        if (proactiveEventsAccessToken == null || System.currentTimeMillis() >= tokenExpiryTime) {
-            Log.w(TAG, "Proactive Events access token is missing or expired. Requesting new one.");
-            getProactiveEventsAccessToken(); // Attempt to get token (will use loaded credentials)
+
+         // Check token validity
+        if (proactiveEventsAccessToken == null || System.currentTimeMillis() >= tokenExpiryTime - 10000) { // Check with 10 sec buffer
+            Log.w(ALEXA_LOG_TAG, "Alexa: Proactive Events access token is missing or expired/expiring soon. Requesting new one first.");
+            getProactiveEventsAccessToken(); // Attempt to get/refresh token
+            // Delay the actual sending attempt to allow token retrieval
             mainHandler.postDelayed(() -> {
-                 if (proactiveEventsAccessToken != null && System.currentTimeMillis() < tokenExpiryTime) {
+                 Log.d(ALEXA_LOG_TAG, "Alexa: Retrying sendProactiveEventInternal after token request delay.");
+                 // Re-check token after delay before sending
+                 if (proactiveEventsAccessToken != null && System.currentTimeMillis() < tokenExpiryTime - 10000) {
+                     Log.d(ALEXA_LOG_TAG, "Alexa: Token seems valid after refresh attempt, proceeding with send.");
                      sendProactiveEventInternal(fallDetails);
                  } else {
-                     Log.e(TAG, "Failed to get token, cannot send proactive event for fall: " + fallDetails.getfallID());
+                     Log.e(ALEXA_LOG_TAG, "Alexa: Failed to get a valid token after refresh attempt, cannot send proactive event for fall: " + fallDetails.getfallID());
+                     mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Failed to refresh Alexa token.", Toast.LENGTH_LONG).show());
                  }
-            }, 3000);
+            }, 5000); // Increased delay to 5 seconds for token request
             return;
         }
 
         // If token is valid, send immediately
+        Log.d(ALEXA_LOG_TAG, "Alexa: Token is valid. Proceeding with sendProactiveEventInternal.");
         sendProactiveEventInternal(fallDetails);
     }
 
 
     private void sendProactiveEventInternal(Fall fallDetails) {
         final String currentToken = proactiveEventsAccessToken;
-        // final String userIdToSend = amazonUserId; // Commented out as we are testing Multicast
+        final String userIdToSend = amazonUserId; // Keep this variable, but it won't be used in Multicast payload
+
+        // --- DIAGNOSTIC LOG ---
+        Log.d(ALEXA_LOG_TAG, "Alexa: Entering sendProactiveEventInternal. User ID (for potential Unicast): " + userIdToSend + ", Token present: " + (currentToken != null && !currentToken.isEmpty()));
+        // --- END DIAGNOSTIC LOG ---
+
+        // Determine delivery type (Modify this logic based on your desired test)
+        final String deliveryType = "Multicast"; // Set to "Unicast" or "Multicast" for testing
+        final String eventName = "AMAZON.MessageAlert.Activated"; // Set desired event schema
+
+
+        // Add a null/empty check specifically for Unicast (won't trigger for Multicast)
+        if ("Unicast".equals(deliveryType) && (userIdToSend == null || userIdToSend.isEmpty())) {
+            Log.e(ALEXA_LOG_TAG, "Alexa: Cannot send Unicast event: User ID is null or empty!");
+            mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Cannot send Alexa alert: User ID missing.", Toast.LENGTH_SHORT).show());
+            return;
+        }
+         if (currentToken == null || currentToken.isEmpty()) {
+             Log.e(ALEXA_LOG_TAG, "Alexa: Cannot send event: Access token is missing!");
+             mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Cannot send Alexa alert: Token missing.", Toast.LENGTH_SHORT).show());
+             return;
+         }
+
 
         networkExecutor.execute(() -> {
             HttpURLConnection connection = null;
+            Log.d(ALEXA_LOG_TAG, "Alexa: Starting background task to send event (" + deliveryType + ", " + eventName + ").");
             try {
-                // 1. Construct the Event Payload JSON for AMAZON.MessageAlert.Activated
+                // 1. Construct Event Payload
                 JSONObject eventPayload = new JSONObject();
-                eventPayload.put("name", "AMAZON.MessageAlert.Activated"); // Reverted event name
+                eventPayload.put("name", eventName);
 
                 JSONObject payloadDetails = new JSONObject();
-                JSONObject stateObject = new JSONObject();
-                stateObject.put("status", "UNREAD"); // Correct state object structure
-                payloadDetails.put("state", stateObject);
-
-                payloadDetails.put("messageGroup", new JSONObject() // Standard MessageAlert structure
-                    .put("creator", new JSONObject().put("name", "RiskWatch Alert"))
-                    .put("count", 1)
-                 );
+                 // --- Payload specific to eventName ---
+                if ("AMAZON.MessageAlert.Activated".equals(eventName)) {
+                    JSONObject stateObject = new JSONObject();
+                    stateObject.put("status", "UNREAD");
+                    payloadDetails.put("state", stateObject);
+                    payloadDetails.put("messageGroup", new JSONObject()
+                        .put("creator", new JSONObject().put("name", "RiskWatch Alert"))
+                        .put("count", 1));
+                } else if ("AMAZON.OrderStatus.Updated".equals(eventName)) {
+                     // Example for OrderStatus (adjust as needed)
+                     JSONObject stateObject = new JSONObject();
+                     stateObject.put("status", "ORDER_SHIPPED"); // Example status
+                     payloadDetails.put("state", stateObject);
+                     JSONObject orderDetails = new JSONObject();
+                     JSONObject seller = new JSONObject();
+                     seller.put("name", "localizedattribute:sellerName"); // Requires localizedAttributes
+                     orderDetails.put("seller", seller);
+                     payloadDetails.put("order", orderDetails);
+                 } // Add other event types if needed
+                // --- End Payload specific ---
                 eventPayload.put("payload", payloadDetails);
 
+                // 2. Construct Full Request Body
+                JSONObject requestBody = new JSONObject();
+                requestBody.put("timestamp", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date()));
+                requestBody.put("referenceId", UUID.randomUUID().toString());
+                requestBody.put("expiryTime", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date(System.currentTimeMillis() + 3600 * 1000 * 24))); // 24 hr expiry
+                requestBody.put("event", eventPayload);
 
-                // 2. Construct the Full Request Body JSON
-                 JSONObject requestBody = new JSONObject();
-                 requestBody.put("timestamp", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date()));
-                 requestBody.put("referenceId", UUID.randomUUID().toString()); // Using UUID
-                 requestBody.put("expiryTime", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(new Date(System.currentTimeMillis() + 3600 * 1000 * 24)));
-                 requestBody.put("event", eventPayload);
+                // 3. Add Relevant Audience
+                JSONObject relevantAudience = new JSONObject();
+                relevantAudience.put("type", deliveryType);
+                if ("Unicast".equals(deliveryType)) {
+                    relevantAudience.put("payload", new JSONObject().put("user", userIdToSend));
+                } else { // Multicast
+                    relevantAudience.put("payload", new JSONObject()); // Empty payload for Multicast
+                }
+                requestBody.put("relevantAudience", relevantAudience);
 
-                 // --- Revert to Multicast for testing ---
-                 JSONObject relevantAudience = new JSONObject();
-                 relevantAudience.put("type", "Multicast");
-                 relevantAudience.put("payload", new JSONObject()); // Empty payload for Multicast
-                 requestBody.put("relevantAudience", relevantAudience);
-                 // --- End Multicast ---
+                // 4. Add Localized Attributes (Example for OrderStatus)
+                 if ("AMAZON.OrderStatus.Updated".equals(eventName)) {
+                     JSONArray localizedAttributes = new JSONArray();
+                     JSONObject enUSAttributes = new JSONObject();
+                     enUSAttributes.put("locale", "en-US");
+                     enUSAttributes.put("sellerName", "RiskWatch Fall Alert"); // Customize as needed
+                     localizedAttributes.put(enUSAttributes);
+                     requestBody.put("localizedAttributes", localizedAttributes);
+                 }
 
-                 // Remove localizedAttributes as they are not standard for MessageAlert
-                 // requestBody.put("localizedAttributes", localizedAttributes);
-
-
+                // 5. Log and Send
                 String jsonInputString = requestBody.toString();
-                Log.d(TAG, "Proactive Event Request Body (Reverted to MessageAlert Multicast - Loading Credentials): " + jsonInputString);
+                Log.d(ALEXA_LOG_TAG, "Alexa: Proactive Event Request Body (" + deliveryType + ", " + eventName + "): " + jsonInputString);
 
-                // 3. Make the HTTP POST Request
                 URL url = new URL(PROACTIVE_EVENTS_API_ENDPOINT);
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("POST");
@@ -915,6 +998,9 @@ public class HomeActivity extends AppCompatActivity {
                 connection.setRequestProperty("Content-Type", "application/json");
                 connection.setRequestProperty("Accept", "application/json");
                 connection.setDoOutput(true);
+                connection.setConnectTimeout(15000); // 15 seconds
+                connection.setReadTimeout(15000);    // 15 seconds
+
 
                 DataOutputStream wr = new DataOutputStream(connection.getOutputStream());
                 wr.writeBytes(jsonInputString);
@@ -922,45 +1008,58 @@ public class HomeActivity extends AppCompatActivity {
                 wr.close();
 
                 int responseCode = connection.getResponseCode();
-                Log.d(TAG, "Proactive Event POST response code: " + responseCode);
+                Log.d(ALEXA_LOG_TAG, "Alexa: Proactive Event POST response code: " + responseCode);
 
-                // ... (rest of response handling - keep the detailed logging) ...
-                 if (responseCode >= 200 && responseCode < 300) {
-                    Log.i(TAG, "Successfully sent proactive event (MessageAlert Multicast) for fall ID: " + fallDetails.getfallID());
-                     if (connection.getInputStream() != null) {
-                         BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                         String inputLine;
-                         StringBuilder response = new StringBuilder();
-                         while ((inputLine = in.readLine()) != null) {
-                             response.append(inputLine);
-                         }
-                         in.close();
-                         Log.d(TAG, "Proactive Event Success Response: " + response.toString());
-                     }
-                    mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Alexa notification sent (Multicast).", Toast.LENGTH_SHORT).show());
-                } else {
-                     if (connection.getErrorStream() != null) {
-                         BufferedReader in = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-                         String inputLine;
-                         StringBuilder response = new StringBuilder();
-                         while ((inputLine = in.readLine()) != null) {
-                             response.append(inputLine);
-                         }
-                         in.close();
-                         Log.e(TAG, "Error sending proactive event: " + responseCode + " - " + response.toString());
-                         mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Failed to send Alexa notification: " + responseCode, Toast.LENGTH_LONG).show());
-                     } else {
-                          Log.e(TAG, "Error sending proactive event: " + responseCode + " - No error stream");
-                          mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Failed to send Alexa notification: " + responseCode, Toast.LENGTH_LONG).show());
+                // 6. Handle Response
+                StringBuilder responseBody = new StringBuilder();
+                InputStream responseStream = null;
+                try {
+                    if (responseCode >= 200 && responseCode < 300) {
+                        responseStream = connection.getInputStream();
+                        Log.i(ALEXA_LOG_TAG, "Alexa: Successfully sent proactive event ("+ deliveryType + ", " + eventName + ") for fall ID: " + fallDetails.getfallID() + ". Code: " + responseCode);
+                        mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Alexa notification sent (" + deliveryType + ").", Toast.LENGTH_SHORT).show());
+                    } else {
+                        responseStream = connection.getErrorStream();
+                         Log.w(ALEXA_LOG_TAG, "Alexa: Received error response code for proactive event: " + responseCode);
+                    }
+
+                    if (responseStream != null) {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(responseStream));
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            responseBody.append(line);
+                        }
+                        reader.close();
+                        Log.d(ALEXA_LOG_TAG, "Alexa: Proactive Event Response Body: " + responseBody.toString());
+                    } else {
+                        Log.d(ALEXA_LOG_TAG, "Alexa: Proactive Event Response Body stream was null.");
+                    }
+
+                    // Handle specific error codes after logging body
+                    if (responseCode >= 300) {
+                         Log.e(ALEXA_LOG_TAG, "Alexa: Error sending proactive event ("+ deliveryType + ", " + eventName + "). Code: " + responseCode + ", Body: " + responseBody.toString());
+                         final String errorMsg = "Failed Alexa send ("+ deliveryType +"): " + responseCode;
+                         mainHandler.post(() -> Toast.makeText(HomeActivity.this, errorMsg, Toast.LENGTH_LONG).show());
+                    }
+
+                } catch (IOException readEx) {
+                     Log.e(ALEXA_LOG_TAG, "Alexa: IOException reading response stream for code " + responseCode, readEx);
+                     final String errorMsg = "Error reading Alexa response: " + responseCode;
+                     mainHandler.post(() -> Toast.makeText(HomeActivity.this, errorMsg, Toast.LENGTH_LONG).show());
+                } finally {
+                     if (responseStream != null) {
+                         try { responseStream.close(); } catch (IOException ignored) {}
                      }
                 }
 
-            } catch (Exception e) {
-                 Log.e(TAG, "Exception during proactive event sending: " + e.getMessage(), e);
+
+            } catch (Exception e) { // Catch broader exceptions like JSONException, MalformedURLException
+                 Log.e(ALEXA_LOG_TAG, "Alexa: Exception during proactive event sending ("+ deliveryType + ", " + eventName + "): " + e.getClass().getSimpleName() + " - " + e.getMessage(), e);
                  mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Network error sending Alexa notification.", Toast.LENGTH_LONG).show());
             } finally {
                 if (connection != null) {
                     connection.disconnect();
+                    Log.d(ALEXA_LOG_TAG, "Alexa: Event send connection disconnected.");
                 }
             }
         });
