@@ -78,6 +78,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import org.json.JSONException;
 
+import android.content.ActivityNotFoundException;
+
 public class HomeActivity extends AppCompatActivity {
 
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
@@ -106,6 +108,12 @@ public class HomeActivity extends AppCompatActivity {
     // --- End Proactive Events Configuration ---
 
     private static final String ALEXA_LOG_TAG = TAG; // Use the existing TAG for consistency or define a new one if preferred
+
+    // --- Alexa Configuration ---
+    // !!! REPLACE THIS WITH YOUR ACTUAL ALEXA SKILL ID !!!
+    // Updated with the provided Skill ID
+    private static final String ALEXA_SKILL_ID = "amzn1.ask.skill.fc8c0677-659c-4f9e-b29f-bfa34c7eeefd";
+    // --- End Alexa Configuration ---
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -249,11 +257,15 @@ public class HomeActivity extends AppCompatActivity {
 
     private void showSettingsDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        final CharSequence[] items = {"Account Linking", "Link Amazon Skill", "Logout"};
+
         builder.setTitle("Settings")
-               .setItems(new CharSequence[]{"Account Linking", "Logout"}, (dialog, which) -> {
-                   if (which == 0) {
+               .setItems(items, (dialog, which) -> {
+                   if (which == 0) { // Account Linking
                        accountLink(null);
-                   } else if (which == 1) {
+                   } else if (which == 1) { // Link Amazon Skill (using new method)
+                       enableAlexaSkill(); // Changed call
+                   } else if (which == 2) { // Logout
                        logOut(null);
                    }
                })
@@ -265,8 +277,11 @@ public class HomeActivity extends AppCompatActivity {
         Intent intent = new Intent(this, LoginScreen.class);
         int faSize = fallArrayList.size();
         fallArrayList.clear();
-        fallItemAdapter.notifyItemRangeRemoved(0, (faSize - 1));
+        if (fallItemAdapter != null && faSize > 0) {
+             fallItemAdapter.notifyItemRangeRemoved(0, faSize);
+        }
         startActivity(intent);
+        finish(); // Finish HomeActivity after logging out
     }
 
     // Adds sample fall to current user for testing purposes (Let's make this dynamic instead of the static)
@@ -496,12 +511,103 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    // Takes user to linking page
+    // Takes user to linking page (LWA)
     public void accountLink(View view) {
         Intent intent = new Intent(this, AccountLink.class);
         startActivity(intent);
     }
 
+    /**
+     * Attempts to open the Alexa app to the skill page using various URIs.
+     * Falls back to a web link.
+     */
+    private void enableAlexaSkill() {
+        String skillId = ALEXA_SKILL_ID; // Use the constant
+        boolean opened = false;
+        String alexaPackage = "com.amazon.dee.app";
+
+        // --- Attempt 1: Standard Published Skill Deep Link (alexa://) ---
+        // Even for dev, this is the most likely *supported* deep link if any works
+        if (!opened) {
+            try {
+                Uri skillUri = Uri.parse("alexa://skills/dp/" + skillId + "/?ref=skill_dp_redirect_app");
+                Intent alexaIntent = new Intent(Intent.ACTION_VIEW, skillUri);
+                // alexaIntent.setPackage(alexaPackage); // Explicit package targeting can sometimes help/hurt, try with and without if needed
+                alexaIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Log.d(ALEXA_LOG_TAG, "Alexa: Attempting V1: alexa://skills/dp/ URI: " + skillUri.toString());
+                startActivity(alexaIntent);
+                opened = true;
+                Log.i(ALEXA_LOG_TAG, "Alexa: Successfully launched intent for V1 URI.");
+            } catch (ActivityNotFoundException e) {
+                Log.w(ALEXA_LOG_TAG, "Alexa: Failed V1 (alexa://skills/dp/): " + e.getMessage());
+            } catch (Exception e) { // Catch other potential exceptions
+                 Log.e(ALEXA_LOG_TAG, "Alexa: Error launching V1 (alexa://skills/dp/): " + e.getMessage());
+            }
+        }
+
+        // --- Attempt 2: Undocumented Dev Skills Section Link (amazon://) ---
+        // Less likely to work, seems based on user speculation
+        if (!opened) {
+            try {
+                Uri devSkillsUri = Uri.parse("amazon://skills/your-skills/dev");
+                Intent alexaIntent = new Intent(Intent.ACTION_VIEW, devSkillsUri);
+                alexaIntent.setPackage(alexaPackage); // Explicitly target Alexa app
+                alexaIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Log.d(ALEXA_LOG_TAG, "Alexa: Attempting V2: amazon://skills/your-skills/dev URI: " + devSkillsUri.toString());
+                startActivity(alexaIntent);
+                opened = true;
+                 Log.i(ALEXA_LOG_TAG, "Alexa: Successfully launched intent for V2 URI (Dev Skills).");
+            } catch (ActivityNotFoundException e) {
+                Log.w(ALEXA_LOG_TAG, "Alexa: Failed V2 (amazon://skills/your-skills/dev): " + e.getMessage());
+            } catch (Exception e) {
+                 Log.e(ALEXA_LOG_TAG, "Alexa: Error launching V2 (amazon://skills/your-skills/dev): " + e.getMessage());
+            }
+        }
+
+        // --- Attempt 3: General Skills Page Link (amazon://) ---
+        if (!opened) {
+            try {
+                Uri skillsUri = Uri.parse("amazon://skills");
+                Intent alexaIntent = new Intent(Intent.ACTION_VIEW, skillsUri);
+                alexaIntent.setPackage(alexaPackage); // Explicitly target Alexa app
+                alexaIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                 Log.d(ALEXA_LOG_TAG, "Alexa: Attempting V3: amazon://skills URI: " + skillsUri.toString());
+                startActivity(alexaIntent);
+                opened = true;
+                 Log.i(ALEXA_LOG_TAG, "Alexa: Successfully launched intent for V3 URI (Skills Home).");
+            } catch (ActivityNotFoundException e) {
+                 Log.w(ALEXA_LOG_TAG, "Alexa: Failed V3 (amazon://skills): " + e.getMessage());
+            } catch (Exception e) {
+                 Log.e(ALEXA_LOG_TAG, "Alexa: Error launching V3 (amazon://skills): " + e.getMessage());
+            }
+        }
+
+        // --- Fallback 4: Web URL (alexa.amazon.com) ---
+        if (!opened) {
+             Log.w(ALEXA_LOG_TAG, "Alexa: All app deep link attempts failed. Falling back to web URL.");
+            try {
+                // Use the alexa.amazon.com SPA link
+                Uri webUri = Uri.parse("https://alexa.amazon.com/spa/index.html#skills/dp/" + skillId + "/");
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, webUri);
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Log.d(ALEXA_LOG_TAG, "Alexa: Attempting Fallback V4: Web URL: " + webUri.toString());
+                startActivity(browserIntent);
+                // We don't set opened=true here, as it's just opening a browser
+            } catch (ActivityNotFoundException e2) {
+                 // This means no browser available - very unlikely
+                 Log.e(ALEXA_LOG_TAG, "Alexa: Failed Fallback V4 (Web URL): No browser found?", e2);
+                Toast.makeText(this,
+                    "Please open the Alexa app or website manually to find the RiskWatch skill",
+                    Toast.LENGTH_LONG).show();
+            } catch (Exception e2) { // Catch other potential exceptions
+                 Log.e(ALEXA_LOG_TAG, "Alexa: Error launching Fallback V4 (Web URL): " + e2.getMessage());
+                  Toast.makeText(this,
+                    "Could not open skill link. Please try manually.",
+                    Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+    // --- End enableAlexaSkill Method ---
 
     // Creates user in the database
     public static void createUserDB(String userName) {
