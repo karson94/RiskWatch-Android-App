@@ -21,12 +21,16 @@ android {
 
     defaultConfig {
         applicationId = "com.ece441.riskwatch"
-        minSdk = 21
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: ""
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     lint {
@@ -47,11 +51,6 @@ android {
     buildFeatures {
         buildConfig = true  // Enable BuildConfig generation
         compose = true
-    }
-    
-    defaultConfig {
-        buildConfigField("String", "MAPS_API_KEY", "\"${localProperties.getProperty("MAPS_API_KEY", "")}\"")
-        manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
     }
     
     composeOptions {
