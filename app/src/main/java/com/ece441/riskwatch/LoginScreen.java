@@ -24,6 +24,8 @@ import com.amazon.identity.auth.device.api.workflow.RequestContext;
 import com.amazon.identity.auth.device.api.authorization.AuthorizeListener;
 import com.amazon.identity.auth.device.api.authorization.ProfileScope;
 import com.amazon.identity.auth.device.api.authorization.AuthCancellation;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.OAuthProvider;
 
 public class LoginScreen extends AppCompatActivity {
 
@@ -66,15 +68,30 @@ public class LoginScreen extends AppCompatActivity {
         requestContext.registerListener(new AuthorizeListener() {
             @Override
             public void onSuccess(AuthorizeResult result) {
-                // Handle successful Amazon login
-                runOnUiThread(() -> {
-                    Log.d(TAG, "Amazon Login successful");
-                    user = new User(result.getUser().getUserId());
-                    Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
-                    intent.putExtra("user", result.getUser().getUserName());
-                    intent.putExtra("amazon_user_id", result.getUser().getUserId());
-                    startActivity(intent);
-                });
+                // Handle successful Amazon login - Directly use Amazon ID
+                Log.d(TAG, "Amazon Login successful, proceeding without Firebase Auth.");
+                String amazonUserId = result.getUser().getUserId();
+                String amazonUserName = result.getUser().getUserName();
+
+                if (amazonUserId == null || amazonUserName == null) {
+                    Log.e(TAG, "Amazon user ID or Name is null after successful login.");
+                    runOnUiThread(() -> Toast.makeText(LoginScreen.this, "Amazon login succeeded but user info was missing.", Toast.LENGTH_LONG).show());
+                    return;
+                }
+                
+                // Optional: Check/Create user entry in Realtime Database (using Amazon ID as key)
+                // This part is good practice but not strictly required for the basic flow asked.
+                // You might want to add user creation logic here later.
+                // DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("users");
+                // usersRef.child(amazonUserId).child("name").setValue(amazonUserName);
+
+                // Start HomeActivity, passing Amazon details
+                Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+                intent.putExtra("user", amazonUserName); // Display name
+                intent.putExtra("amazon_user_id", amazonUserId); // The ID to use for DB operations
+                intent.putExtra("isGuest", false); // Clearly not a guest
+                startActivity(intent);
+                finish(); // Optional: finish LoginScreen
             }
 
             @Override

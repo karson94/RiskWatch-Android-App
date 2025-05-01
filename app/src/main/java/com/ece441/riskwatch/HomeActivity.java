@@ -79,6 +79,8 @@ import java.nio.charset.StandardCharsets;
 import org.json.JSONException;
 
 import android.content.ActivityNotFoundException;
+import com.google.firebase.database.ChildEventListener;
+import androidx.annotation.Nullable;
 
 public class HomeActivity extends AppCompatActivity {
 
@@ -87,8 +89,6 @@ public class HomeActivity extends AppCompatActivity {
     private static FallItemAdapter fallItemAdapter;
 
     User currentUser;
-
-    boolean startup = true;
 
     private LocationManager locationManager;
     private Geocoder geocoder;
@@ -115,14 +115,34 @@ public class HomeActivity extends AppCompatActivity {
     private static final String ALEXA_SKILL_ID = "amzn1.ask.skill.fc8c0677-659c-4f9e-b29f-bfa34c7eeefd";
     // --- End Alexa Configuration ---
 
+    // Store the primary user ID for this session (could be Firebase UID or Amazon ID)
+    private String primaryUserId = null; 
+    private String userDisplayName = "Guest";
+    private boolean isGuestUser = true; // Assume guest unless logged in
+
+    private DatabaseReference fallsRefListener = null; // Reference for the listener
+    private ChildEventListener fallChildEventListener = null; // The listener itself
+
+    // --- Background Thread Control ---
+    private volatile boolean isRunning = true; // Flag to control the background thread
+    private Thread backgroundReaderThread = null;
+    // --- End Background Thread Control ---
+
+    // --- Startup Delay --- 
+    private long activityStartTimeMillis = 0;
+    private static final long STARTUP_DELAY_MS = 5000; // 5 seconds
+    // --- End Startup Delay --- 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
+        activityStartTimeMillis = System.currentTimeMillis(); // Record start time
 
         // Load Alexa credentials from assets
         loadAlexaCredentials();
 
+        // --- Location Permission Check (moved up) ---
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -132,71 +152,76 @@ public class HomeActivity extends AppCompatActivity {
                 },
                 1);
         }
+        // --- End Location Permission Check ---
 
-        // Get the intent that started this activity
+        // --- Process Intent and Determine User ID ---
         Intent receivedIntent = getIntent();
-        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
+        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser(); // Still useful for Guest/Email logins
 
         if (receivedIntent != null) {
-            String username = receivedIntent.getStringExtra("user");
-            boolean isGuest = receivedIntent.getBooleanExtra("isGuest", false);
-            // Retrieve Amazon User ID if provided by LoginScreen
-            amazonUserId = receivedIntent.getStringExtra("amazon_user_id"); 
+            isGuestUser = receivedIntent.getBooleanExtra("isGuest", false);
+            amazonUserId = receivedIntent.getStringExtra("amazon_user_id"); // Keep this for Alexa logic
+            userDisplayName = receivedIntent.getStringExtra("user");
             
-            // Only update username if we received a new one
-            if (username != null) {
-                savedUsername = username;
+            if (amazonUserId != null && !isGuestUser) {
+                 // Amazon Login flow (manual linking)
+                 // Sanitize the Amazon ID to make it a valid Firebase key
+                 String sanitizedAmazonId = amazonUserId.replace('.', '_').replace('#', '_').replace('$', '_').replace('[', '_').replace(']', '_');
+                 primaryUserId = sanitizedAmazonId; // Use SANITIZED Amazon ID as the primary key
+                 Log.d(TAG, "Using SANITIZED Amazon User ID as primary key: " + primaryUserId);
+            } else if (!isGuestUser && fireUser != null) {
+                 // Email/Password Login flow
+                 primaryUserId = fireUser.getUid(); // Use Firebase UID as primary key
+                 if (userDisplayName == null) userDisplayName = fireUser.getDisplayName(); // Use Firebase display name if not passed
+                 Log.d(TAG, "Using Firebase UID as primary key: " + primaryUserId);
+            } else if (isGuestUser && fireUser != null) {
+                 // Guest Login flow (Firebase Anonymous)
+                 primaryUserId = fireUser.getUid(); // Use Firebase Anonymous UID as primary key
+                 userDisplayName = "Guest"; // Ensure display name is Guest
+                 Log.d(TAG, "Using Anonymous Firebase UID as primary key: " + primaryUserId);
+            } else {
+                 // Error case or unexpected state
+                 Log.e(TAG, "Could not determine valid user ID. isGuest: " + isGuestUser + ", amazonUserId: " + amazonUserId + ", fireUser: " + (fireUser != null));
+                 Toast.makeText(this, "Error identifying user.", Toast.LENGTH_LONG).show();
+                 // Consider finishing activity or redirecting to login
+                 finish(); 
+                 return; // Prevent rest of onCreate
             }
             
-            currentUser = new User(savedUsername != null ? savedUsername : "Guest");
-            Log.d(TAG, "HOME USERNAME " + currentUser.getUserName());
+            // Update currentUser object (optional, if still used elsewhere)
+            currentUser = new User(userDisplayName); // Use the determined display name
+            Log.d(TAG, "HOME USERNAME set to: " + currentUser.getUserName());
+            Log.d(TAG, "isGuest flag: " + isGuestUser);
             
+            // Existing Alexa token logic (uses amazonUserId if present)
             if (amazonUserId != null) {
-                Log.d(TAG, "Amazon User ID: " + amazonUserId);
-                // Attempt to get token only if credentials loaded successfully
+                Log.d(TAG, "Amazon User ID provided: " + amazonUserId);
                 if (alexaSkillClientId != null && alexaSkillClientSecret != null) {
                     getProactiveEventsAccessToken();
                 } else {
                     Log.e(TAG, "Alexa credentials not loaded, cannot get proactive events token.");
-                    Toast.makeText(this, "Error: Alexa credentials missing.", Toast.LENGTH_LONG).show();
+                    // Toast.makeText(this, "Error: Alexa credentials missing.", Toast.LENGTH_LONG).show(); // Less intrusive logging
                 }
             }
             
-            if (!isGuest) {
-                // Only assert fireUser for non-guest users
-                assert fireUser != null;
-                Log.d(TAG, "FireAuth UID: " + fireUser.getUid());
-            }
-        }
+            // Removed the assertion/check for fireUser here as primaryUserId handles identification
 
-        initRead();
-        startup = false;
+        } else {
+            Log.e(TAG, "Received Intent was null in HomeActivity onCreate.");
+            Toast.makeText(this, "Error starting home screen.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        // --- End Intent Processing ---
+
+        initRead(); // Use primaryUserId internally now
+        attachFallListener(); // Attach listener for NEW falls
 
         TextView userNameDisplay = findViewById(R.id.userNameView);
-        userNameDisplay.setText("Hi " + currentUser.getUserName() + "!");
+        userNameDisplay.setText("Hi " + userDisplayName + "!"); // Use the determined display name
 
         FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference usersRef = database.getReference("users");
-
-        // Instantiate user if they do not exist by getting account's user name
-        usersRef.orderByChild("name").equalTo(currentUser.getUserName()).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists()) {
-                    // User "Bob" does not exist, so create a new entry
-                    createUserDB(currentUser.getUserName());
-                }
-
-                // Add a fall entry for user as a test to ensure we can store a fall for them
-                // addFallEntry(fireUser.getUid(),  "06:48 PM", "01/05/24", 15, 92, "Front", 2.6);
-
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.w(TAG, "Failed to read value.", error.toException());
-            }
-        });
+        // DatabaseReference usersRef = database.getReference("users"); // No longer needed for this part
 
         // Create recycler view
         recyclerView = findViewById(R.id.fallRecycler);
@@ -207,22 +232,32 @@ public class HomeActivity extends AppCompatActivity {
         // Make recycler have vertical layout
         recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
 
-        // Thread to read database after every second
-        Thread thread = new Thread(() -> {
+        // --- Background Thread for initRead (if still needed for periodic refresh?) ---
+        // Consider if this polling thread is still necessary now that ChildEventListener is used for *new* items.
+        // If only initial load is needed, remove this thread entirely.
+        // If periodic refresh of *all* data is desired (e.g., for potential missed events), keep it but manage it.
+        isRunning = true; // Reset flag in case activity is recreated
+        backgroundReaderThread = new Thread(() -> {
             try {
-                while (true) {
-                    // Actual database read function
-                    initRead();
-                    // Delay (up for debate, should be maybe 30 seconds?)
-                    Thread.sleep(1000); // Add a delay of 1 second between each read
+                while (isRunning) {
+                    // Perform the initial/periodic read on a background thread
+                    // Use post to update UI if needed from initRead results, though initRead currently doesn't update UI directly
+                    // initRead(); // This fetches ALL falls repeatedly 
+                    
+                    // Log that the thread is running (for debugging)
+                    Log.d(TAG, "Background reader thread loop running...");
+
+                    // Delay - Adjust interval as needed, or remove if thread is removed
+                    Thread.sleep(30000); // Example: Refresh every 30 seconds
                 }
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Log.d(TAG, "Background reader thread interrupted.");
+                Thread.currentThread().interrupt(); // Preserve interrupt status
             }
+            Log.d(TAG, "Background reader thread finished.");
         });
-
-        // Start thread
-        thread.start();
+        backgroundReaderThread.start(); // Start the managed thread
+        // --- End Background Thread ---
 
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
         bottomNav.setSelectedItemId(R.id.navigation_home);
@@ -253,6 +288,14 @@ public class HomeActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        Log.d(TAG, "onDestroy called");
+        // --- Graceful Shutdown --- 
+        isRunning = false; // Signal thread to stop
+        if (backgroundReaderThread != null) {
+            backgroundReaderThread.interrupt(); // Interrupt the sleep/wait
+        }
+        detachFallListener(); // Clean up the listener
+        // --- End Graceful Shutdown --- 
     }
 
     private void showSettingsDialog() {
@@ -274,6 +317,15 @@ public class HomeActivity extends AppCompatActivity {
 
     // Logs current user out of the application, take user back to login screen
     public void logOut(View view) {
+        Log.d(TAG, "logOut called");
+        // --- Graceful Shutdown --- 
+        isRunning = false; // Signal thread to stop
+        if (backgroundReaderThread != null) {
+            backgroundReaderThread.interrupt(); // Interrupt the sleep/wait
+        }
+        detachFallListener(); // Detach listener FIRST
+        // --- End Graceful Shutdown ---
+        
         Intent intent = new Intent(this, LoginScreen.class);
         int faSize = fallArrayList.size();
         fallArrayList.clear();
@@ -326,10 +378,13 @@ public class HomeActivity extends AppCompatActivity {
                     else if (dirIndex < 80) fallDirection = "Left";     // 20% left
                     else fallDirection = "Right";                       // 20% right
 
-                    FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
-                    if (fireUser != null) {
-                        addFallEntry(fireUser.getUid(), time, date, deltaHeartRate, heartRate, 
+                    // Use the primaryUserId determined in onCreate
+                    if (primaryUserId != null) {
+                        addFallEntry(primaryUserId, time, date, deltaHeartRate, heartRate, 
                                    fallDirection, impactSeverity);
+                    } else {
+                        Log.e(TAG, "primaryUserId is null in addRandFall. Cannot add fall.");
+                        Toast.makeText(this, "Error identifying user.", Toast.LENGTH_SHORT).show();
                     }
                 } else {
                     Toast.makeText(this, "Unable to get location", Toast.LENGTH_SHORT).show();
@@ -343,11 +398,12 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     // Gets passed fall metrics, creates new fall in database for current user
+    // The 'userId' parameter will now be the primaryUserId (Firebase UID or Amazon ID)
     public void addFallEntry(String userId, String time, String date,
                              int deltaHeartRate, int heartRate, String fallDirection, double impactSeverity) {
         FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference usersRef = database.getReference("users");
-        DatabaseReference fallsRef = usersRef.child(userId).child("falls");
+        // Change path to top-level /falls/{userId}
+        DatabaseReference fallsRef = database.getReference("falls").child(userId);
 
         String fallId = fallsRef.push().getKey();
         assert fallId != null;
@@ -374,7 +430,7 @@ public class HomeActivity extends AppCompatActivity {
         }
 
         // Add location data using existing method
-        addLocationToFall(fallId);
+        addLocationToFall(userId, fallId);
 
         // --- Send Proactive Event if Amazon user is logged in ---
         if (amazonUserId != null && !amazonUserId.isEmpty()) {
@@ -397,73 +453,37 @@ public class HomeActivity extends AppCompatActivity {
     // If fall listener, read the user's permission list and display the list of falls
     // If fall creator, display own falls
     public void initRead() {
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
-            // User is not authenticated, handle this case
+        // Use the primaryUserId determined in onCreate
+        if (primaryUserId == null) {
+            Log.e(TAG, "primaryUserId is null in initRead. Cannot read data.");
             return;
         }
-        String ownerId = currentUser.getUid();
+        String ownerId = primaryUserId;
 
-        // Get reference to the falls node in the database for the current user
-        DatabaseReference currentUserFallsRef = FirebaseDatabase.getInstance().getReference("users")
-                .child(ownerId).child("falls");
+        // Get reference to the falls node in the database for the current user ID
+        // Change path to top-level /falls/{ownerId}
+        DatabaseReference currentUserFallsRef = FirebaseDatabase.getInstance().getReference("falls")
+                .child(ownerId);
 
-        // Check if the current user has any falls
-        currentUserFallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (dataSnapshot.exists()) {
-                    // User has falls, read falls for the current user
-                    readFallsForUser(ownerId);
-                } else {
-                    // User does not have falls, check if linked to another account
-                    DatabaseReference permissionsRef = FirebaseDatabase.getInstance().getReference("permissions");
-
-                    permissionsRef.orderByChild("grantedUsers/" + ownerId).equalTo(true).addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                            if (dataSnapshot.exists()) {
-                                // User is linked to another account, retrieve the owner ID
-                                for (DataSnapshot permissionSnapshot : dataSnapshot.getChildren()) {
-                                    String linkedAccountId = permissionSnapshot.getKey();
-                                    if (linkedAccountId != null) {
-                                        // Read falls for the linked account
-                                        readFallsForUser(linkedAccountId);
-                                        return;
-                                    }
-                                }
-                            } else {
-                                // User is neither linked nor has falls, handle this case
-                                // For example, display a message indicating no falls available
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-                            Log.w(TAG, "Failed to read value.", error.toException());
-                        }
-                    });
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.w(TAG, "Failed to read value.", error.toException());
-            }
-        });
+        // Simplified: Always read falls directly for the ownerId.
+        // Remove the logic checking for permissions/linked accounts for now.
+        readFallsForUser(ownerId);
     }
 
     // This will actually read the database for the passed userID's falls
+    // The userID passed here will be the primaryUserId
     public void readFallsForUser(String userID) {
         FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference userRef = database.getReference("users");
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        // DatabaseReference userRef = database.getReference("users"); // No longer needed here
 
-        if (currentUser == null) {
+        // Removed FirebaseUser check as it's not the primary identifier anymore
+        if (userID == null || userID.isEmpty()) {
+             Log.e(TAG, "UserID passed to readFallsForUser is null or empty.");
             return;
         }
 
-        DatabaseReference currentUserFallsRef = userRef.child(userID).child("falls");
+        // Change path to top-level /falls/{userID}
+        DatabaseReference currentUserFallsRef = database.getReference("falls").child(userID);
 
         currentUserFallsRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -474,14 +494,27 @@ public class HomeActivity extends AppCompatActivity {
                     String fallID = fallSnapshot.getKey();
                     String time = fallSnapshot.child("time").getValue(String.class);
                     String date = fallSnapshot.child("date").getValue(String.class);
-                    int heartRate = fallSnapshot.child("heartRate").getValue(Integer.class);
-                    int deltaHeartRate = fallSnapshot.child("deltaHeartRate").getValue(Integer.class);
-                    double impactSeverity = fallSnapshot.child("impactSeverity").getValue(Double.class);
+                    
+                    // Safely get integer values, providing default (0) if null
+                    Integer heartRateObj = fallSnapshot.child("heartRate").getValue(Integer.class);
+                    int heartRate = (heartRateObj != null) ? heartRateObj : 0;
+                    
+                    Integer deltaHeartRateObj = fallSnapshot.child("deltaHeartRate").getValue(Integer.class);
+                    int deltaHeartRate = (deltaHeartRateObj != null) ? deltaHeartRateObj : 0;
+                    
+                    // Safely get double value, providing default (0.0) if null
+                    Double impactSeverityObj = fallSnapshot.child("impactSeverity").getValue(Double.class);
+                    double impactSeverity = (impactSeverityObj != null) ? impactSeverityObj : 0.0;
+                    
                     String fallDirection = fallSnapshot.child("fallDirection").getValue(String.class);
 
-                    double latitude = fallSnapshot.child("latitude").getValue(Double.class);
-                    double longitude = fallSnapshot.child("longitude").getValue(Double.class);
+                    // Safely get location values
+                    Double latitudeObj = fallSnapshot.child("latitude").getValue(Double.class);
+                    double latitude = (latitudeObj != null) ? latitudeObj : 0.0;
+                    Double longitudeObj = fallSnapshot.child("longitude").getValue(Double.class);
+                    double longitude = (longitudeObj != null) ? longitudeObj : 0.0;
                     String address = fallSnapshot.child("address").getValue(String.class);
+                    if (address == null) address = "Unknown location"; // Default for address too
 
                     boolean fallExists = false;
                     for (Fall fall : fallArrayList) {
@@ -492,16 +525,27 @@ public class HomeActivity extends AppCompatActivity {
                     }
 
                     if (!fallExists) {
-                        fallArrayList.add(0, new Fall(fallID, time, date, heartRate, deltaHeartRate, 
-                            impactSeverity, fallDirection, latitude, longitude, address));
-                        fallItemAdapter.notifyItemInserted(0);
-                        recyclerView.scrollToPosition(0);
-
-                        if (!startup) {
-                        // notifyFallToast(HomeActivity.this);
+                        Fall newlyReadFall = new Fall(fallID, time, date, heartRate, deltaHeartRate, 
+                            impactSeverity, fallDirection, latitude, longitude, address);
+                        fallArrayList.add(0, newlyReadFall);
+                        
+                        // Notify adapter after adding
+                        if (fallItemAdapter != null) {
+                            final int insertIndex = 0; // Assuming we always add at the top
+                            mainHandler.post(() -> {
+                                fallItemAdapter.notifyItemInserted(insertIndex);
+                                // Optional: Scroll to top if desired
+                                // recyclerView.scrollToPosition(insertIndex);
+                            });
                         }
+                        
+                        // Removed !startup check here as notifications are handled by listener
                     }
-                }
+                } // End of loop processing initial falls
+                
+                // --- Initial load complete --- 
+                Log.d(TAG, "Initial fall data read complete.");
+                // --- End Initial load complete --- 
             }
 
             @Override
@@ -630,9 +674,9 @@ public class HomeActivity extends AppCompatActivity {
         startActivity(bluetoothIntent);
     }
 
-    private void addLocationToFall(String fallId) {
-        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (fireUser != null && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+    private void addLocationToFall(String userId, String fallId) {
+        // Use the passed userId (which should be primaryUserId)
+        if (userId != null && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
                 == PackageManager.PERMISSION_GRANTED) {
             
             locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -646,11 +690,11 @@ public class HomeActivity extends AppCompatActivity {
                     final String address = getAddressFromLocation(lastLocation);
 
                     // Update Firebase
+                    // Change path to top-level /falls/{userId}/{fallId}
                     DatabaseReference fallRef = FirebaseDatabase.getInstance()
-                        .getReference("users")
-                        .child(fireUser.getUid())
-                        .child("falls")
-                        .child(fallId);
+                        .getReference("falls") // Top-level "falls"
+                        .child(userId)      // User ID
+                        .child(fallId);     // Specific Fall ID
                         
                     Map<String, Object> locationUpdates = new HashMap<>();
                     locationUpdates.put("latitude", latitude);
@@ -692,7 +736,7 @@ public class HomeActivity extends AppCompatActivity {
                 Log.e(TAG, "Error accessing location: " + e.getMessage());
             }
         } else {
-             Log.w(TAG, "Location permission not granted or Firebase user is null.");
+             Log.w(TAG, "Location permission not granted or userId is null in addLocationToFall.");
         }
     }
 
@@ -820,8 +864,8 @@ public class HomeActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent.hasExtra("time")) {
-            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-            if (currentUser != null) {
+            // Use the primaryUserId established in onCreate
+            if (primaryUserId != null) {
                 String time = intent.getStringExtra("time");
                 String date = intent.getStringExtra("date");
                 int heartRate = intent.getIntExtra("heartRate", 0);
@@ -830,7 +874,7 @@ public class HomeActivity extends AppCompatActivity {
                 String fallDirection = intent.getStringExtra("fallDirection");
                 
                 // Use existing addFallEntry method
-                addFallEntry(currentUser.getUid(), time, date, deltaHeartRate, heartRate, 
+                addFallEntry(primaryUserId, time, date, deltaHeartRate, heartRate, 
                             fallDirection, impactSeverity);
             }
         }
@@ -1171,6 +1215,130 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
+    private void attachFallListener() {
+        if (primaryUserId == null) {
+            Log.e(TAG, "Cannot attach fall listener, primaryUserId is null.");
+            return;
+        }
+    
+        // Reference to the user's falls path
+        fallsRefListener = FirebaseDatabase.getInstance().getReference("falls").child(primaryUserId);
+    
+        // Detach any existing listener first (safety measure)
+        detachFallListener(); 
+    
+        Log.d(TAG, "Attaching ChildEventListener to: " + fallsRefListener.toString());
+        fallChildEventListener = new ChildEventListener() {
+            @Override
+            public void onChildAdded(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // A new fall has been added AFTER the listener was attached
+                Log.d(TAG, "onChildAdded triggered for fall ID: " + dataSnapshot.getKey());
+                
+                 // --- Time-based Startup Delay Check --- 
+                long currentTimeMillis = System.currentTimeMillis();
+                if (currentTimeMillis - activityStartTimeMillis < STARTUP_DELAY_MS) {
+                    Log.d(TAG, "onChildAdded skipped within " + STARTUP_DELAY_MS + "ms startup delay.");
+                    return; 
+                }
+                // --- End Time-based Startup Delay Check --- 
+    
+                try {
+                    // Parse the newly added fall data (with null checks)
+                    String fallID = dataSnapshot.getKey();
+                    if (fallID == null) return; // Should not happen, but safety check
+    
+                    String time = dataSnapshot.child("time").getValue(String.class);
+                    String date = dataSnapshot.child("date").getValue(String.class);
+                    Integer heartRateObj = dataSnapshot.child("heartRate").getValue(Integer.class);
+                    int heartRate = (heartRateObj != null) ? heartRateObj : 0;
+                    Integer deltaHeartRateObj = dataSnapshot.child("deltaHeartRate").getValue(Integer.class);
+                    int deltaHeartRate = (deltaHeartRateObj != null) ? deltaHeartRateObj : 0;
+                    Double impactSeverityObj = dataSnapshot.child("impactSeverity").getValue(Double.class);
+                    double impactSeverity = (impactSeverityObj != null) ? impactSeverityObj : 0.0;
+                    String fallDirection = dataSnapshot.child("fallDirection").getValue(String.class);
+                    Double latitudeObj = dataSnapshot.child("latitude").getValue(Double.class);
+                    double latitude = (latitudeObj != null) ? latitudeObj : 0.0;
+                    Double longitudeObj = dataSnapshot.child("longitude").getValue(Double.class);
+                    double longitude = (longitudeObj != null) ? longitudeObj : 0.0;
+                    String address = dataSnapshot.child("address").getValue(String.class);
+                    if (address == null) address = "Unknown location";
+    
+                    Fall newFall = new Fall(fallID, time, date, heartRate, deltaHeartRate,
+                                           impactSeverity, fallDirection, latitude, longitude, address);
+    
+                    // --- CRUCIAL CHECK: Avoid duplicates ---
+                    // Check if this fall ID is already in our list (loaded by initRead)
+                    boolean alreadyExists = false;
+                    for (Fall existingFall : fallArrayList) {
+                        if (existingFall.getfallID().equals(fallID)) {
+                            alreadyExists = true;
+                            break;
+                        }
+                    }
+    
+                    if (!alreadyExists) {
+                        Log.d(TAG, "New fall detected (not in list): " + fallID + ". Adding and Notifying.");
+                        // Add to the beginning of the list and update UI
+                        fallArrayList.add(0, newFall);
+                        if (fallItemAdapter != null) {
+                             mainHandler.post(() -> fallItemAdapter.notifyItemInserted(0));
+                             // Optional: Scroll to top if desired
+                             // recyclerView.scrollToPosition(0);
+                        }
+    
+                        // --- Trigger Notifications ---
+                        showFallNotification(time, address, impactSeverity, latitude, longitude);
+                        if (amazonUserId != null && !amazonUserId.isEmpty()) {
+                            Log.d(TAG, "Attempting to send proactive event for new fall ID: " + fallID);
+                            sendProactiveEventNotification(newFall);
+                        }
+                        // --- End Trigger Notifications ---
+    
+                    } else {
+                         Log.d(TAG, "Fall " + fallID + " already exists in the list, skipping add/notification from onChildAdded.");
+                    }
+    
+                } catch (Exception e) {
+                     Log.e(TAG, "Error processing fall in onChildAdded", e);
+                }
+            }
+    
+            @Override
+            public void onChildChanged(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // Handle fall data updates if needed (e.g., location added later)
+                 Log.d(TAG, "onChildChanged for fall ID: " + dataSnapshot.getKey());
+                 // You might want to update the item in fallArrayList and notifyItemChanged here
+            }
+    
+            @Override
+            public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
+                // Handle fall deletion if needed
+                 Log.d(TAG, "onChildRemoved for fall ID: " + dataSnapshot.getKey());
+                 // You might want to remove the item from fallArrayList and notifyItemRemoved here
+            }
+    
+            @Override
+            public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // Usually not relevant for this structure
+            }
+    
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.w(TAG, "Fall ChildEventListener failed:", databaseError.toException());
+                // Maybe try re-attaching after a delay?
+            }
+        };
+        fallsRefListener.addChildEventListener(fallChildEventListener);
+    }
+    
+    private void detachFallListener() {
+        if (fallsRefListener != null && fallChildEventListener != null) {
+            Log.d(TAG, "Detaching ChildEventListener from: " + fallsRefListener.toString());
+            fallsRefListener.removeEventListener(fallChildEventListener);
+            fallChildEventListener = null;
+            fallsRefListener = null;
+        }
+    }
 
     // --- End Methods for Alexa Proactive Events ---
 }
