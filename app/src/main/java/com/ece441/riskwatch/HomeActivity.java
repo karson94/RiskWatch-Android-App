@@ -116,22 +116,17 @@ public class HomeActivity extends AppCompatActivity {
     // --- End Alexa Configuration ---
 
     // Store the primary user ID for this session (could be Firebase UID or Amazon ID)
-    private String primaryUserId = null; 
+    private String primaryUserId = null;
     private String userDisplayName = "Guest";
     private boolean isGuestUser = true; // Assume guest unless logged in
 
     private DatabaseReference fallsRefListener = null; // Reference for the listener
     private ChildEventListener fallChildEventListener = null; // The listener itself
 
-    // --- Background Thread Control ---
-    private volatile boolean isRunning = true; // Flag to control the background thread
-    private Thread backgroundReaderThread = null;
-    // --- End Background Thread Control ---
-
-    // --- Startup Delay --- 
+    // --- Startup Delay ---
     private long activityStartTimeMillis = 0;
     private static final long STARTUP_DELAY_MS = 5000; // 5 seconds
-    // --- End Startup Delay --- 
+    // --- End Startup Delay ---
 
     private String googleMapsApiKey = null; // To store the loaded Maps API key
 
@@ -145,7 +140,7 @@ public class HomeActivity extends AppCompatActivity {
         loadAlexaCredentials(); // Load Alexa credentials
 
         // --- Location Permission Check (moved up) ---
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                 new String[]{
@@ -164,7 +159,7 @@ public class HomeActivity extends AppCompatActivity {
             isGuestUser = receivedIntent.getBooleanExtra("isGuest", false);
             amazonUserId = receivedIntent.getStringExtra("amazon_user_id"); // Keep this for Alexa logic
             userDisplayName = receivedIntent.getStringExtra("user");
-            
+
             if (amazonUserId != null && !isGuestUser) {
                  // Amazon Login flow (manual linking)
                  // Sanitize the Amazon ID to make it a valid Firebase key
@@ -186,15 +181,15 @@ public class HomeActivity extends AppCompatActivity {
                  Log.e(TAG, "Could not determine valid user ID. isGuest: " + isGuestUser + ", amazonUserId: " + amazonUserId + ", fireUser: " + (fireUser != null));
                  Toast.makeText(this, "Error identifying user.", Toast.LENGTH_LONG).show();
                  // Consider finishing activity or redirecting to login
-                 finish(); 
+                 finish();
                  return; // Prevent rest of onCreate
             }
-            
+
             // Update currentUser object (optional, if still used elsewhere)
             currentUser = new User(userDisplayName); // Use the determined display name
             Log.d(TAG, "HOME USERNAME set to: " + currentUser.getUserName());
             Log.d(TAG, "isGuest flag: " + isGuestUser);
-            
+
             // Existing Alexa token logic (uses amazonUserId if present)
             if (amazonUserId != null) {
                 Log.d(TAG, "Amazon User ID provided: " + amazonUserId);
@@ -205,7 +200,7 @@ public class HomeActivity extends AppCompatActivity {
                     // Toast.makeText(this, "Error: Alexa credentials missing.", Toast.LENGTH_LONG).show(); // Less intrusive logging
                 }
             }
-            
+
             // Removed the assertion/check for fireUser here as primaryUserId handles identification
 
         } else {
@@ -215,9 +210,6 @@ public class HomeActivity extends AppCompatActivity {
             return;
         }
         // --- End Intent Processing ---
-
-        initRead(); // Use primaryUserId internally now
-        attachFallListener(); // Attach listener for NEW falls
 
         TextView userNameDisplay = findViewById(R.id.userNameView);
         userNameDisplay.setText("Hi " + userDisplayName + "!"); // Use the determined display name
@@ -234,32 +226,12 @@ public class HomeActivity extends AppCompatActivity {
         // Make recycler have vertical layout
         recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
 
-        // --- Background Thread for initRead (if still needed for periodic refresh?) ---
-        // Consider if this polling thread is still necessary now that ChildEventListener is used for *new* items.
-        // If only initial load is needed, remove this thread entirely.
-        // If periodic refresh of *all* data is desired (e.g., for potential missed events), keep it but manage it.
-        isRunning = true; // Reset flag in case activity is recreated
-        backgroundReaderThread = new Thread(() -> {
-            try {
-                while (isRunning) {
-                    // Perform the initial/periodic read on a background thread
-                    // Use post to update UI if needed from initRead results, though initRead currently doesn't update UI directly
-                    // initRead(); // This fetches ALL falls repeatedly 
-                    
-                    // Log that the thread is running (for debugging)
-                    Log.d(TAG, "Background reader thread loop running...");
+        // --- Attach listener first, then perform initial read --- 
+        attachFallListener(); // Attach listener for NEW falls BEFORE initial load
+        initRead(); // Perform the initial read ONCE
+        // --- End Listener/Initial Read order ---
 
-                    // Delay - Adjust interval as needed, or remove if thread is removed
-                    Thread.sleep(30000); // Example: Refresh every 30 seconds
-                }
-            } catch (InterruptedException e) {
-                Log.d(TAG, "Background reader thread interrupted.");
-                Thread.currentThread().interrupt(); // Preserve interrupt status
-            }
-            Log.d(TAG, "Background reader thread finished.");
-        });
-        backgroundReaderThread.start(); // Start the managed thread
-        // --- End Background Thread ---
+        // --- Background Thread Removed --- 
 
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
         bottomNav.setSelectedItemId(R.id.navigation_home);
@@ -291,13 +263,9 @@ public class HomeActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "onDestroy called");
-        // --- Graceful Shutdown --- 
-        isRunning = false; // Signal thread to stop
-        if (backgroundReaderThread != null) {
-            backgroundReaderThread.interrupt(); // Interrupt the sleep/wait
-        }
+        // --- Graceful Shutdown (Removed thread logic) --- 
         detachFallListener(); // Clean up the listener
-        // --- End Graceful Shutdown --- 
+        // --- End Graceful Shutdown ---
     }
 
     private void showSettingsDialog() {
@@ -320,19 +288,16 @@ public class HomeActivity extends AppCompatActivity {
     // Logs current user out of the application, take user back to login screen
     public void logOut(View view) {
         Log.d(TAG, "logOut called");
-        // --- Graceful Shutdown --- 
-        isRunning = false; // Signal thread to stop
-        if (backgroundReaderThread != null) {
-            backgroundReaderThread.interrupt(); // Interrupt the sleep/wait
-        }
+        // --- Graceful Shutdown (Removed thread logic) --- 
         detachFallListener(); // Detach listener FIRST
         // --- End Graceful Shutdown ---
-        
+
         Intent intent = new Intent(this, LoginScreen.class);
         int faSize = fallArrayList.size();
         fallArrayList.clear();
         if (fallItemAdapter != null && faSize > 0) {
-             fallItemAdapter.notifyItemRangeRemoved(0, faSize);
+             // Ensure notification happens on the main thread if there's any doubt
+             mainHandler.post(() -> fallItemAdapter.notifyItemRangeRemoved(0, faSize));
         }
         startActivity(intent);
         finish(); // Finish HomeActivity after logging out
