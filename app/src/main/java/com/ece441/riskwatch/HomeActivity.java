@@ -133,14 +133,16 @@ public class HomeActivity extends AppCompatActivity {
     private static final long STARTUP_DELAY_MS = 5000; // 5 seconds
     // --- End Startup Delay --- 
 
+    private String googleMapsApiKey = null; // To store the loaded Maps API key
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
         activityStartTimeMillis = System.currentTimeMillis(); // Record start time
 
-        // Load Alexa credentials from assets
-        loadAlexaCredentials();
+        loadMapsApiKey(); // Load the Maps API key
+        loadAlexaCredentials(); // Load Alexa credentials
 
         // --- Location Permission Check (moved up) ---
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) 
@@ -225,8 +227,8 @@ public class HomeActivity extends AppCompatActivity {
 
         // Create recycler view
         recyclerView = findViewById(R.id.fallRecycler);
-        // Pass Fall list to the adapter
-        fallItemAdapter = new FallItemAdapter(fallArrayList, this);
+        // Pass Fall list to the adapter, including the API key
+        fallItemAdapter = new FallItemAdapter(fallArrayList, this, googleMapsApiKey);
         // Pass adapter to recycler view
         recyclerView.setAdapter(fallItemAdapter);
         // Make recycler have vertical layout
@@ -789,14 +791,44 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void showFallNotification(String time, String location, double severity, double latitude, double longitude) {
+        // Ensure the API key is loaded before constructing the URL
+        if (googleMapsApiKey == null || googleMapsApiKey.isEmpty()) {
+            Log.e(TAG, "Google Maps API key is missing. Cannot show map in notification.");
+            // Optionally show notification without map, or just log error
+            // For now, let's proceed without the map if key is missing
+             // Create the notification builder (without map initially)
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "fall_detection_channel")
+                .setSmallIcon(R.drawable.ic_warning)
+                .setContentTitle("Fall Detected!")
+                .setContentText("Time: " + time + " | Location: " + location)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true);
+
+            // Add action button to open maps
+            Intent mapIntent = new Intent(Intent.ACTION_VIEW);
+            mapIntent.setData(Uri.parse(String.format(Locale.US, "geo:%f,%f?q=%f,%f", latitude, longitude, latitude, longitude)));
+            PendingIntent mapPendingIntent = PendingIntent.getActivity(this, 1, mapIntent, PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(android.R.drawable.ic_dialog_map, "View Location", mapPendingIntent);
+            
+            // Show the notification without the map image
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(HomeActivity.this);
+            if (ActivityCompat.checkSelfPermission(HomeActivity.this, 
+                    android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                notificationManager.notify(1, builder.build()); // Use a unique ID, e.g., 1
+            }
+            return; // Exit the method as we can't load the map
+        }
+
         String staticMapUrl = String.format(
+            Locale.US, // Use Locale.US to ensure decimal points are periods
             "https://maps.googleapis.com/maps/api/staticmap?center=%f,%f&zoom=15&size=600x300&markers=color:red%%7C%f,%f&key=%s",
-            latitude, longitude, latitude, longitude, BuildConfig.MAPS_API_KEY
+            latitude, longitude, latitude, longitude, googleMapsApiKey // Use the loaded key
         );
+        Log.d(TAG, "Static Map URL: " + staticMapUrl); // Log the URL for debugging
 
         // Create intent to open Google Maps
         Intent mapIntent = new Intent(Intent.ACTION_VIEW);
-        mapIntent.setData(Uri.parse(String.format("geo:%f,%f?q=%f,%f", latitude, longitude, latitude, longitude)));
+        mapIntent.setData(Uri.parse(String.format(Locale.US, "geo:%f,%f?q=%f,%f", latitude, longitude, latitude, longitude)));
         PendingIntent mapPendingIntent = PendingIntent.getActivity(this, 1, mapIntent, PendingIntent.FLAG_IMMUTABLE);
 
         // Create the notification builder
@@ -834,6 +866,8 @@ public class HomeActivity extends AppCompatActivity {
                         .setBigContentTitle("Fall Detected!")
                         .setSummaryText(location);
                     builder.setStyle(bigPictureStyle);
+                } else {
+                     Log.w(TAG, "Map bitmap was null, showing notification without map image.");
                 }
 
                 // Show the notification
@@ -1341,4 +1375,32 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     // --- End Methods for Alexa Proactive Events ---
+
+    // --- Add this new method --- 
+    private void loadMapsApiKey() {
+        try {
+            InputStream is = getAssets().open("google_maps_config.json");
+            int size = is.available();
+            byte[] buffer = new byte[size];
+            is.read(buffer);
+            is.close();
+            String json = new String(buffer, StandardCharsets.UTF_8);
+            JSONObject config = new JSONObject(json);
+            googleMapsApiKey = config.getString("mapsApiKey");
+            if (googleMapsApiKey == null || googleMapsApiKey.isEmpty()) {
+                 Log.e(TAG, "Maps API Key loaded from JSON is null or empty.");
+                 googleMapsApiKey = null; // Ensure it's null if empty
+            } else {
+                 Log.i(TAG, "Google Maps API Key loaded successfully.");
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Error reading google_maps_config.json from assets", e);
+            googleMapsApiKey = null;
+            mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Error reading Maps config.", Toast.LENGTH_LONG).show());
+        } catch (JSONException e) {
+            Log.e(TAG, "Error parsing JSON from google_maps_config.json", e);
+            googleMapsApiKey = null;
+             mainHandler.post(() -> Toast.makeText(HomeActivity.this, "Error parsing Maps config.", Toast.LENGTH_LONG).show());
+        }
+    }
 }
