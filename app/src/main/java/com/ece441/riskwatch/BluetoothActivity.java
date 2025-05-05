@@ -88,15 +88,13 @@ public class BluetoothActivity extends AppCompatActivity {
                 showSettingsDialog();
                 return true;
             } else if (itemId == R.id.navigation_home) {
-                handleActivityTransition();
                 Intent intent = new Intent(this, HomeActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
                 startActivity(intent);
                 return true;
             } else if (itemId == R.id.navigation_analysis) {
-                handleActivityTransition();
                 Intent intent = new Intent(this, FallAnalysisActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
                 startActivity(intent);
                 return true;
             }

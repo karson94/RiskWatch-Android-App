@@ -84,6 +84,12 @@ import androidx.annotation.Nullable;
 
 public class HomeActivity extends AppCompatActivity {
 
+    // Constants for saved instance state keys
+    private static final String STATE_PRIMARY_USER_ID = "primaryUserId";
+    private static final String STATE_AMAZON_USER_ID = "amazonUserId";
+    private static final String STATE_USER_DISPLAY_NAME = "userDisplayName";
+    private static final String STATE_IS_GUEST = "isGuestUser";
+
     private static final ArrayList<Fall> fallArrayList = new ArrayList<>();
     private RecyclerView recyclerView;
     private static FallItemAdapter fallItemAdapter;
@@ -151,65 +157,82 @@ public class HomeActivity extends AppCompatActivity {
         }
         // --- End Location Permission Check ---
 
-        // --- Process Intent and Determine User ID ---
-        Intent receivedIntent = getIntent();
-        FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser(); // Still useful for Guest/Email logins
-
-        if (receivedIntent != null) {
-            isGuestUser = receivedIntent.getBooleanExtra("isGuest", false);
-            amazonUserId = receivedIntent.getStringExtra("amazon_user_id"); // Keep this for Alexa logic
-            userDisplayName = receivedIntent.getStringExtra("user");
-
-            if (amazonUserId != null && !isGuestUser) {
-                 // Amazon Login flow (manual linking)
-                 // Sanitize the Amazon ID to make it a valid Firebase key
-                 String sanitizedAmazonId = amazonUserId.replace('.', '_').replace('#', '_').replace('$', '_').replace('[', '_').replace(']', '_');
-                 primaryUserId = sanitizedAmazonId; // Use SANITIZED Amazon ID as the primary key
-                 Log.d(TAG, "Using SANITIZED Amazon User ID as primary key: " + primaryUserId);
-            } else if (!isGuestUser && fireUser != null) {
-                 // Email/Password Login flow
-                 primaryUserId = fireUser.getUid(); // Use Firebase UID as primary key
-                 if (userDisplayName == null) userDisplayName = fireUser.getDisplayName(); // Use Firebase display name if not passed
-                 Log.d(TAG, "Using Firebase UID as primary key: " + primaryUserId);
-            } else if (isGuestUser && fireUser != null) {
-                 // Guest Login flow (Firebase Anonymous)
-                 primaryUserId = fireUser.getUid(); // Use Firebase Anonymous UID as primary key
-                 userDisplayName = "Guest"; // Ensure display name is Guest
-                 Log.d(TAG, "Using Anonymous Firebase UID as primary key: " + primaryUserId);
+        // --- Process User ID: Restore state first, then check Intent --- 
+        boolean userRestored = false;
+        if (savedInstanceState != null) {
+            primaryUserId = savedInstanceState.getString(STATE_PRIMARY_USER_ID);
+            amazonUserId = savedInstanceState.getString(STATE_AMAZON_USER_ID);
+            userDisplayName = savedInstanceState.getString(STATE_USER_DISPLAY_NAME);
+            isGuestUser = savedInstanceState.getBoolean(STATE_IS_GUEST);
+            if (primaryUserId != null) { // Check if restoration was successful
+                userRestored = true;
+                Log.d(TAG, "User state restored from savedInstanceState. Primary ID: " + primaryUserId);
             } else {
-                 // Error case or unexpected state
-                 Log.e(TAG, "Could not determine valid user ID. isGuest: " + isGuestUser + ", amazonUserId: " + amazonUserId + ", fireUser: " + (fireUser != null));
-                 Toast.makeText(this, "Error identifying user.", Toast.LENGTH_LONG).show();
-                 // Consider finishing activity or redirecting to login
-                 finish();
-                 return; // Prevent rest of onCreate
+                 Log.w(TAG, "savedInstanceState was not null, but failed to restore primaryUserId.");
             }
-
-            // Update currentUser object (optional, if still used elsewhere)
-            currentUser = new User(userDisplayName); // Use the determined display name
-            Log.d(TAG, "HOME USERNAME set to: " + currentUser.getUserName());
-            Log.d(TAG, "isGuest flag: " + isGuestUser);
-
-            // Existing Alexa token logic (uses amazonUserId if present)
-            if (amazonUserId != null) {
-                Log.d(TAG, "Amazon User ID provided: " + amazonUserId);
-                if (alexaSkillClientId != null && alexaSkillClientSecret != null) {
-                    getProactiveEventsAccessToken();
-                } else {
-                    Log.e(TAG, "Alexa credentials not loaded, cannot get proactive events token.");
-                    // Toast.makeText(this, "Error: Alexa credentials missing.", Toast.LENGTH_LONG).show(); // Less intrusive logging
-                }
-            }
-
-            // Removed the assertion/check for fireUser here as primaryUserId handles identification
-
-        } else {
-            Log.e(TAG, "Received Intent was null in HomeActivity onCreate.");
-            Toast.makeText(this, "Error starting home screen.", Toast.LENGTH_LONG).show();
-            finish();
-            return;
         }
-        // --- End Intent Processing ---
+
+        if (!userRestored) {
+            Log.d(TAG, "User state not restored, processing Intent.");
+            Intent receivedIntent = getIntent();
+            FirebaseUser fireUser = FirebaseAuth.getInstance().getCurrentUser(); // Still useful for Guest/Email logins
+
+            if (receivedIntent != null) {
+                isGuestUser = receivedIntent.getBooleanExtra("isGuest", false);
+                amazonUserId = receivedIntent.getStringExtra("amazon_user_id"); // Keep this for Alexa logic
+                userDisplayName = receivedIntent.getStringExtra("user");
+
+                if (amazonUserId != null && !isGuestUser) {
+                     // Amazon Login flow (manual linking)
+                     // Sanitize the Amazon ID to make it a valid Firebase key
+                     String sanitizedAmazonId = amazonUserId.replace('.', '_').replace('#', '_').replace('$', '_').replace('[', '_').replace(']', '_');
+                     primaryUserId = sanitizedAmazonId; // Use SANITIZED Amazon ID as the primary key
+                     Log.d(TAG, "Using SANITIZED Amazon User ID as primary key: " + primaryUserId);
+                } else if (!isGuestUser && fireUser != null) {
+                     // Email/Password Login flow
+                     primaryUserId = fireUser.getUid(); // Use Firebase UID as primary key
+                     if (userDisplayName == null) userDisplayName = fireUser.getDisplayName(); // Use Firebase display name if not passed
+                     Log.d(TAG, "Using Firebase UID as primary key: " + primaryUserId);
+                } else if (isGuestUser && fireUser != null) {
+                     // Guest Login flow (Firebase Anonymous)
+                     primaryUserId = fireUser.getUid(); // Use Firebase Anonymous UID as primary key
+                     userDisplayName = "Guest"; // Ensure display name is Guest
+                     Log.d(TAG, "Using Anonymous Firebase UID as primary key: " + primaryUserId);
+                } // The 'else' for error case is handled below
+
+            } else {
+                Log.w(TAG, "Received Intent was null in HomeActivity onCreate (after checking saved state).");
+                // Don't immediately error out here, check primaryUserId below
+            }
+        }
+
+        // --- Final User ID Check --- 
+        if (primaryUserId == null || primaryUserId.isEmpty()) {
+            // This covers errors from both Intent processing and failed restoration
+            Log.e(TAG, "Could not determine valid user ID after checking state and intent. isGuest: " + isGuestUser + ", amazonUserId: " + amazonUserId);
+            Toast.makeText(this, "Error identifying user. Please log in again.", Toast.LENGTH_LONG).show();
+            logOut(null); // Force logout
+            return; // Prevent rest of onCreate
+        }
+        // --- End Final User ID Check --- 
+
+
+        // --- Setup UI and Continue --- 
+        // Update currentUser object (optional, if still used elsewhere)
+        currentUser = new User(userDisplayName); // Use the determined display name
+        Log.d(TAG, "HOME USERNAME set to: " + currentUser.getUserName());
+        Log.d(TAG, "isGuest flag: " + isGuestUser);
+
+        // Existing Alexa token logic (uses amazonUserId if present)
+        if (amazonUserId != null && !amazonUserId.isEmpty()) {
+            Log.d(TAG, "Amazon User ID available: " + amazonUserId);
+            if (alexaSkillClientId != null && alexaSkillClientSecret != null) {
+                getProactiveEventsAccessToken();
+            } else {
+                Log.e(TAG, "Alexa credentials not loaded, cannot get proactive events token.");
+                // Toast.makeText(this, "Error: Alexa credentials missing.", Toast.LENGTH_LONG).show(); // Less intrusive logging
+            }
+        }
 
         TextView userNameDisplay = findViewById(R.id.userNameView);
         userNameDisplay.setText("Hi " + userDisplayName + "!"); // Use the determined display name
@@ -239,17 +262,19 @@ public class HomeActivity extends AppCompatActivity {
             int itemId = item.getItemId();
             if (itemId == R.id.navigation_bluetooth) {
                 Intent intent = new Intent(this, BluetoothActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                // Consider passing user data if BluetoothActivity needs it
+                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT); // Bring existing to front if possible
                 startActivity(intent);
                 return true;
             } else if (itemId == R.id.navigation_settings) {
                 showSettingsDialog();
                 return true;
             } else if (itemId == R.id.navigation_home) {
-                return true;
+                return true; // Already here
             } else if (itemId == R.id.navigation_analysis) {
                 Intent intent = new Intent(this, FallAnalysisActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                // Consider passing user data if FallAnalysisActivity needs it
+                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT); // Bring existing to front if possible
                 startActivity(intent);
                 return true;
             }
@@ -257,6 +282,17 @@ public class HomeActivity extends AppCompatActivity {
         });
 
         createNotificationChannel();
+    }
+
+    // Method to save instance state
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        Log.d(TAG, "onSaveInstanceState called");
+        outState.putString(STATE_PRIMARY_USER_ID, primaryUserId);
+        outState.putString(STATE_AMAZON_USER_ID, amazonUserId);
+        outState.putString(STATE_USER_DISPLAY_NAME, userDisplayName);
+        outState.putBoolean(STATE_IS_GUEST, isGuestUser);
     }
 
     @Override
@@ -293,6 +329,7 @@ public class HomeActivity extends AppCompatActivity {
         // --- End Graceful Shutdown ---
 
         Intent intent = new Intent(this, LoginScreen.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK); // Clear task for clean logout
         int faSize = fallArrayList.size();
         fallArrayList.clear();
         if (fallItemAdapter != null && faSize > 0) {

@@ -48,9 +48,8 @@ public class FallAnalysisActivity extends AppCompatActivity implements OnMapRead
                 showSettingsDialog();
                 return true;
             } else if (itemId == R.id.navigation_home) {
-                Intent intent = new Intent(this, HomeActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                startActivity(intent);
+                // Finish current activity to go back to existing HomeActivity instance
+                finish(); 
                 return true;
             } else if (itemId == R.id.navigation_analysis) {
                 return true;
