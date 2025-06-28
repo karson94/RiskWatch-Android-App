@@ -1,6 +1,7 @@
 package com.ece441.riskwatch;
 
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -14,6 +15,8 @@ public class MyViewHolder  extends RecyclerView.ViewHolder{
     public TextView fallEventHR;
     public TextView fallEventImpSev;
     public TextView fallEventFallDir;
+    public TextView fallEventLocation;
+    public ImageView mapPreview;
 
 
     public MyViewHolder(@NonNull View itemView) {
@@ -25,6 +28,8 @@ public class MyViewHolder  extends RecyclerView.ViewHolder{
         fallEventImpSev = itemView.findViewById(R.id.fallEventImpSev);
         fallEventHR = itemView.findViewById(R.id.fallEventHR);
         fallEventFallDir = itemView.findViewById(R.id.fallEventFallDir);
+        fallEventLocation = itemView.findViewById(R.id.fallEventLocation);
+        mapPreview = itemView.findViewById(R.id.mapPreview);
 
     }
 }

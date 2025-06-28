@@ -1,72 +1,197 @@
 package com.ece441.riskwatch;
 
 import static android.content.ContentValues.TAG;
-
-import androidx.activity.ComponentActivity;
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
-
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-
-import static android.content.ContentValues.TAG;
-
 import android.Manifest;
-import android.bluetooth.*;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.os.Bundle;
-import androidx.activity.ComponentActivity;
-
 import android.content.pm.PackageManager;
-import android.util.Log;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.Toast;
-
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
-
 import com.google.firebase.auth.*;
-
-import java.util.Objects;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.amazon.identity.auth.device.AuthError;
+import com.amazon.identity.auth.device.api.authorization.AuthorizationManager;
+import com.amazon.identity.auth.device.api.authorization.AuthorizeRequest;
+import com.amazon.identity.auth.device.api.authorization.AuthorizeResult;
+import com.amazon.identity.auth.device.api.workflow.RequestContext;
+import com.amazon.identity.auth.device.api.authorization.AuthorizeListener;
+import com.amazon.identity.auth.device.api.authorization.ProfileScope;
+import com.amazon.identity.auth.device.api.authorization.AuthCancellation;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.OAuthProvider;
 
 public class LoginScreen extends AppCompatActivity {
 
     public User user;
     private FirebaseAuth mAuth;
+    private RequestContext requestContext; // Amazon Login context
+
+    // Register for the activity result launchers
+    private final ActivityResultLauncher<String[]> requestPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.POST_NOTIFICATIONS)) {
+                    // Permission granted
+                }
+            });
+
+    private final ActivityResultLauncher<String[]> requestBluetoothPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.BLUETOOTH_CONNECT) &&
+                        isGranted.get(Manifest.permission.BLUETOOTH_SCAN)) {
+                    // Permissions granted
+                }
+            });
+
+    private final ActivityResultLauncher<String[]> requestLocationPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGranted -> {
+                if (isGranted.get(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                        isGranted.get(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    // Location permissions granted
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login_screen);
         mAuth = FirebaseAuth.getInstance();
+        
+        // Initialize Amazon Login
+        requestContext = RequestContext.create(this);
+        requestContext.registerListener(new AuthorizeListener() {
+            @Override
+            public void onSuccess(AuthorizeResult result) {
+                // Handle successful Amazon login - Directly use Amazon ID
+                Log.d(TAG, "Amazon Login successful, proceeding without Firebase Auth.");
+                String amazonUserId = result.getUser().getUserId();
+                String amazonUserName = result.getUser().getUserName();
+
+                if (amazonUserId == null || amazonUserName == null) {
+                    Log.e(TAG, "Amazon user ID or Name is null after successful login.");
+                    runOnUiThread(() -> Toast.makeText(LoginScreen.this, "Amazon login succeeded but user info was missing.", Toast.LENGTH_LONG).show());
+                    return;
+                }
+                
+                // Optional: Check/Create user entry in Realtime Database (using Amazon ID as key)
+                // This part is good practice but not strictly required for the basic flow asked.
+                // You might want to add user creation logic here later.
+                // DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("users");
+                // usersRef.child(amazonUserId).child("name").setValue(amazonUserName);
+
+                // Start HomeActivity, passing Amazon details
+                Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+                intent.putExtra("user", amazonUserName); // Display name
+                intent.putExtra("amazon_user_id", amazonUserId); // The ID to use for DB operations
+                intent.putExtra("isGuest", false); // Clearly not a guest
+                startActivity(intent);
+                finish(); // Optional: finish LoginScreen
+            }
+
+            @Override
+            public void onError(AuthError ae) {
+                // Handle Amazon login error
+                runOnUiThread(() -> {
+                    Log.e(TAG, "Amazon Login error: " + ae.getMessage());
+                    Toast.makeText(LoginScreen.this, 
+                        "Amazon Login Failed: " + ae.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onCancel(AuthCancellation cancellation) {
+                // Handle when user cancels the login process
+                runOnUiThread(() -> {
+                    Log.d(TAG, "Amazon Login cancelled by user");
+                    Toast.makeText(LoginScreen.this, 
+                        "Login cancelled", 
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+        
+        // Check all required permissions
+        checkNotificationPermission();
+        checkBluetoothPermissions();
+        checkLocationPermissions();
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        requestContext.onResume();
+    }
+    
+    @Override
+    protected void onStart() {
+        super.onStart();
     }
 
-    public void login(View view){
+    // Permission check methods
+    private void checkNotificationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
+        }
+    }
 
+    private void checkLocationPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestLocationPermissionLauncher.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            });
+        }
+    }
+
+    private void checkBluetoothPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            requestBluetoothPermissionLauncher.launch(new String[]{
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN
+            });
+        }
+    }
+
+    public void login(View view) {
         EditText editUsername = findViewById(R.id.userNameInput);
         EditText editPassword = findViewById(R.id.passwordInput);
-        String email = editUsername.getText().toString().trim();
+        String input = editUsername.getText().toString().trim();
         String password = editPassword.getText().toString().trim();
 
-        if (email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Please enter both email and password", Toast.LENGTH_SHORT).show();
+        if (input.isEmpty()) {
+            Toast.makeText(this, "Please enter a username or email", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        mAuth.signInWithEmailAndPassword(email, password)
+        // If password is empty, treat it as a guest login
+        if (password.isEmpty()) {
+            mAuth.signInAnonymously().addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+                    intent.putExtra("user", "Guest");  // Always use "Guest" for anonymous users
+                    intent.putExtra("isGuest", true);
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(LoginScreen.this, "Guest login failed.",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+            return;
+        }
+
+        // Regular email/password login
+        mAuth.signInWithEmailAndPassword(input, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        // Sign in success, update UI with the signed-in user's information
                         FirebaseUser fireUser = mAuth.getCurrentUser();
                         if (fireUser != null) {
                             Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
@@ -75,8 +200,8 @@ public class LoginScreen extends AppCompatActivity {
                             startActivity(intent);
                         }
                     } else {
-                        // If sign in fails, display a message to the user.
-                        Toast.makeText(LoginScreen.this, "Authentication failed. " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginScreen.this, "Authentication failed. " + 
+                            task.getException().getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -86,8 +211,31 @@ public class LoginScreen extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void guestLogin(View view) {
+        Log.d(TAG, "guestLogin() started");
+        mAuth.signInAnonymously()
+            .addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    Log.d(TAG, "signInAnonymously:success");
+                    Intent intent = new Intent(LoginScreen.this, HomeActivity.class);
+                    intent.putExtra("user", "Guest");
+                    intent.putExtra("isGuest", true);
+                    startActivity(intent);
+                } else {
+                    Log.w(TAG, "signInAnonymously:failure", task.getException());
+                    Toast.makeText(LoginScreen.this, "Anonymous authentication failed.",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+    }
+    
+    // Amazon Login methods - simplified for testing
+    public void loginWithAmazon(View view) {
+        Log.d(TAG, "Amazon Login initiated");
+        AuthorizationManager.authorize(
+            new AuthorizeRequest.Builder(requestContext)
+                .addScopes(ProfileScope.profile())
+                .build()
+        );
+    }
 }
-
-
-
-

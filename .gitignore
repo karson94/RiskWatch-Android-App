@@ -13,3 +13,13 @@
 .externalNativeBuild
 .cxx
 local.properties
+.vscode
+
+# Amazon API Key
+app/src/main/assets/api_key.txt
+
+# Alexa Skill
+app/src/main/assets/alexa_skill.json
+
+# Google Maps API Key
+app/src/main/assets/google_maps_config.json
